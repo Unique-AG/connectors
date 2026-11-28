@@ -37,6 +37,7 @@ async def get_group_settings(
         contexts.EntityType | None,
         Field(description="Only the fields of INDIVIDUAL or ORGANISATION cases."),
     ] = None,
+    *,
     required_only: Annotated[bool, Field(description="Only the fields a case must carry.")] = False,
     upstream: Upstream = Depends(get_upstream),
     cache: Cache = Depends(get_cache),

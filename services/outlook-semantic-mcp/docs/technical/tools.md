@@ -1,13 +1,13 @@
 <!-- confluence-page-id: 2061238285 -->
 <!-- confluence-space-key: PUBDOC -->
 
-The Outlook Semantic MCP Server exposes tools whose availability depends on the deployment mode (`MCP_BACKEND`) and debug settings.
+The Outlook Semantic MCP Server registers only the tools listed in [`MCP_TOOLS`](../operator/configuration.md#MCP_TOOLS). Which tools may be listed depends on the deployment mode (`MCP_BACKEND`) and debug settings.
 
 !!! warning "Mode A (`microsoft_graph_and_unique_api`) only tools"
-    `verify_inbox_connection`, `reconnect_inbox`, `delete_inbox_data`, and `sync_progress` are **only available when `MCP_BACKEND=microsoft_graph_and_unique_api`**. They are not registered in `microsoft_graph` mode.
+    `verify_inbox_connection`, `reconnect_inbox`, `delete_inbox_data`, and `sync_progress` are **only available when `MCP_BACKEND=microsoft_graph_and_unique_api`**. The server refuses to start in `microsoft_graph` mode if `MCP_TOOLS` lists them.
 
 !!! warning "Debug-Mode Tools"
-    `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync` are **only available when `MCP_BACKEND=microsoft_graph_and_unique_api` AND `MCP_DEBUG_MODE=enabled`**. They do not appear for standard deployments or in `microsoft_graph` mode. **Note:** Debug mode exposes these tools to **all** connected MCP users, not just operators. Do not leave enabled in production.
+    `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`, and `admin_ops` are **only available when `MCP_BACKEND=microsoft_graph_and_unique_api` AND `MCP_DEBUG_MODE=enabled`**, and only when they are listed in `MCP_TOOLS`. They do not appear for standard deployments or in `microsoft_graph` mode. **Note:** Listed debug tools are exposed to **all** connected MCP users, not just operators. Do not leave debug mode enabled in production.
 
 ## Tool Overview
 
@@ -31,17 +31,18 @@ The Outlook Semantic MCP Server exposes tools whose availability depends on the 
 | [`pause_full_sync`](#pause_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
 | [`resume_full_sync`](#resume_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
 | [`restart_full_sync`](#restart_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
-| [`list_calendars`](#list_calendars) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
-| [`search_calendar_events`](#search_calendar_events) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
-| [`check_availability`](#check_availability) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
-| [`suggest_meeting_times`](#suggest_meeting_times) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
-| [`respond_to_invite`](#respond_to_invite) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
-| [`create_event`](#create_event) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
-| [`update_event`](#update_event) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
-| [`cancel_event`](#cancel_event) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
+| [`admin_ops`](#admin_ops) | Diagnostics (debug only) | No | Mode A only |
+| [`list_calendars`](#list_calendars) | Calendar | No | Both |
+| [`search_calendar_events`](#search_calendar_events) | Calendar | No | Both |
+| [`check_availability`](#check_availability) | Calendar | No | Both |
+| [`suggest_meeting_times`](#suggest_meeting_times) | Calendar | No | Both |
+| [`respond_to_invite`](#respond_to_invite) | Calendar | Yes | Both |
+| [`create_event`](#create_event) | Calendar | Yes | Both |
+| [`update_event`](#update_event) | Calendar | Yes | Both |
+| [`cancel_event`](#cancel_event) | Calendar | Yes | Both |
 
 !!! warning "Calendar tools"
-    The eight calendar tools are registered only when `CALENDAR_INTEGRATION=enabled`. They query Microsoft Graph live (no calendar ingest). `respond_to_invite` notifies immediately; create, update, and cancel wait for in-chat confirmation. See [Calendar](#Calendar).
+    A calendar tool is registered only when it is listed in `MCP_TOOLS`. Listing any of them turns calendar on. They query Microsoft Graph live (no calendar ingest). `respond_to_invite` notifies immediately; create, update, and cancel wait for in-chat confirmation. See [Calendar](#Calendar).
 
 **Mutating** means the tool writes data to at least one of the following:
 
@@ -334,6 +335,7 @@ Fetch the next page of results, or retry a throttled or failed page, for searche
 - Cursors are stored server-side (`search_cursors` table) and scoped to the user. The agent only sees the id. Unknown ids, ids of another user, and ids older than 30 days are reported in `searchNotes`.
 - Cursor rows are immutable: each page gets a new id, and following an id again returns the same page. A throttled or failed page keeps its id so it can be retried without skipping results.
 - The same email can appear on pages of different requests; `msGraphMessageId` identifies it.
+- With [sensitivity exclusions](../operator/configuration.md#Sensitivity-exclusions) set, excluded mail is dropped from each page after Graph returns it. A page can therefore come back with fewer results than its size, or none, and still carry a cursor. `searchNotes` says how many emails were withheld and under which labels.
 
 ---
 
@@ -346,12 +348,12 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `id` | string | Yes | Microsoft Graph message id. Use `openEmailParams.id`. |
-| `mailbox` | email | No | Use `mailbox` from that object when present. |
+| `mailbox` | email | No | Use `mailbox` from that object when present. With `DELEGATED_ACCESS_SCAN=disabled`, any mailbox other than the user's own is refused. |
 | `parentFolderId` | string | No | Use `parentFolderId` from that object when present. Without it, a `mailbox` message is read from `/users/{mailbox}/messages/{id}`. |
 | `idIsImmutable` | boolean | No | Use `idIsImmutable` from that object when present. |
 | `bodyContentType` | `"text"` \| `"html"` | No | `"html"` when the message is a draft. Omit for plain text. |
-| `uniqueContentId` | string | No | Ingested content id from a semantic match. When set, the matched chunks are returned in `chunks`. |
-| `chunkIds` | string[] | No | Ids of those matched chunks. Pass them through with `uniqueContentId`. |
+| `uniqueContentId` | string | No | Ingested content id from a semantic match. When set, the matched chunks are returned in `chunks`. Offered only with `MCP_BACKEND=microsoft_graph_and_unique_api`, the only backend whose search returns it. |
+| `chunkIds` | string[] | No | Ids of those matched chunks. Pass them through with `uniqueContentId`. Offered only with `MCP_BACKEND=microsoft_graph_and_unique_api`. |
 
 **Return shape:**
 
@@ -375,9 +377,11 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
 
 **Usage notes:**
 
-- Always pass the `openEmailParams` object from a `search_emails` result directly as the tool input — do not construct these parameters manually and do not drop `uniqueContentId` or `chunkIds`. The tool reads the live message from Microsoft Graph. A draft's object sets `bodyContentType` to `"html"`, and `emailData.text` is then that HTML. Every other message is plain text.
-- When `uniqueContentId` and `chunkIds` are set, `emailData.chunks` holds those matched ingested passages, including attachment text. The live body stays in `text`. If the ingested email cannot be read from Unique, or it was ingested again and none of the matched chunks remain, the body is still returned and `chunks` is left out.
+- Always pass the `openEmailParams` object from a `search_emails` result directly as the tool input — do not construct these parameters manually and do not drop `uniqueContentId` or `chunkIds` (present only with `MCP_BACKEND=microsoft_graph_and_unique_api`). The tool reads the live message from Microsoft Graph. A draft's object sets `bodyContentType` to `"html"`, and `emailData.text` is then that HTML. Every other message is plain text.
+- With `MCP_BACKEND=microsoft_graph_and_unique_api`, when `uniqueContentId` and `chunkIds` are set, `emailData.chunks` holds those matched ingested passages, including attachment text. The live body stays in `text`. If the ingested email cannot be read from Unique, or it was ingested again and none of the matched chunks remain, the body is still returned and `chunks` is left out.
+- With `DELEGATED_ACCESS_SCAN=disabled` the server works with the signed-in user's own mailbox only. A `mailbox` other than the user's own email address or user principal name (compared case-insensitively) returns `success: false` with a message, before any Microsoft Graph call. See [Configuration — DELEGATED_ACCESS_SCAN](../operator/configuration.md#DELEGATED_ACCESS_SCAN).
 - When Microsoft Graph answers 404 or 400 (the email was deleted or moved in Outlook, or the params come from an older search, such as a Unique content id), the tool returns `success: false` and a `message` telling the agent to run `search_emails` again.
+- A message with a sensitivity excluded by [`EXCLUDED_SENSITIVITY_LABELS` or `EXCLUDED_LEGACY_SENSITIVITY`](../operator/configuration.md#Sensitivity-exclusions), or whose sensitivity cannot be read while one is set, returns `success: false` and a `message` naming the label as configured (its id, with a note that its name is not known, when it is configured by id; or saying it could not be read) and telling the agent the user can read the email in Outlook. No content of it is returned.
 - `webLink` is the Outlook on the web link of the email. For a shared or delegated mailbox it is the classic OWA link built from the message RestId (see `BuildWebLinksCommand`), because the link Graph returns for those mailboxes does not always open. Link the subject to it when it is set; otherwise show the subject as plain text.
 - The `text` field in `emailData` contains the full email body from Graph. This is distinct from the `text` field in search results, which contains only matched passages and/or a short preview.
 - `metadata.isDraft` tells whether the message is an unsent draft. Read a draft with this tool before editing it with [`update_draft_email`](#update_draft_email), and edit `text`, not `chunks`. `metadata.attachments` lists the attachments (file name and `isInline`; inline ones are signature images and the like). [`remove_attachments_from_draft_email`](#remove_attachments_from_draft_email) skips inline ones unless `includeInline` is true.
@@ -400,7 +404,7 @@ Supports two modes selected by `recipientsData.type`:
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `content` | string | Yes | Email body in Markdown. Paragraphs, bold, italic, lists, links, blockquotes, and inline code are supported. Raw HTML is escaped, not rendered. |
-| `mailbox` | string (UPN) | No | Shared mailbox to create the draft in (e.g. `"support@company.com"`). Omit to use the signed-in user's own mailbox. |
+| `mailbox` | string (UPN) | No | Shared mailbox to create the draft in (e.g. `"support@company.com"`). Omit to use the signed-in user's own mailbox. With `DELEGATED_ACCESS_SCAN=disabled`, any mailbox other than the user's own is refused. |
 | `attachments` | array | No | Files to attach |
 | `attachments[].fileName` | string | Yes | File name including extension (e.g. `"report.pdf"`) |
 | `attachments[].data` | string | Yes | File content URI. Two schemes supported (see below) |
@@ -432,7 +436,7 @@ Supports two modes selected by `recipientsData.type`:
 | Inline base64 | `data:[mediatype];base64,<data>` | Base64-encoded content with explicit MIME type |
 
 !!! warning "Attachment scheme availability"
-    The `unique://content/{contentId}` scheme only works when `UNIQUE_SERVICE_AUTH_MODE=cluster_local`. In external auth mode the Unique ingestion service cannot resolve internal content URIs — use the `data:[mediatype];base64,<data>` scheme instead.
+    The `unique://content/{contentId}` scheme only works when `UNIQUE_ATTACHMENTS=enabled` (the default) and `UNIQUE_SERVICE_AUTH_MODE=cluster_local`. With `UNIQUE_ATTACHMENTS=disabled` the tool does not offer it and fails such an attachment. In external auth mode the Unique ingestion service cannot resolve internal content URIs. Use the `data:[mediatype];base64,<data>` scheme instead.
 
 **Return shape:**
 
@@ -455,6 +459,7 @@ Supports two modes selected by `recipientsData.type`:
 - Use `lookup_contacts` to resolve recipient email addresses before calling this tool.
 - If attachments partially fail, the draft is still created and `draftId` is returned alongside the `attachmentsFailed` list.
 - The `webLink` in the response opens the draft directly in Outlook Web.
+- With `DELEGATED_ACCESS_SCAN=disabled` the server works with the signed-in user's own mailbox only. A `mailbox` other than the user's own email address or user principal name (compared case-insensitively) returns `success: false` with a message, before any Microsoft Graph call. See [Configuration — DELEGATED_ACCESS_SCAN](../operator/configuration.md#DELEGATED_ACCESS_SCAN).
 - For shared mailbox reply drafts: in Outlook Web the reply appears in the **Drafts** folder rather than inline in the thread — this is expected Outlook Web behaviour. The draft sends correctly regardless. In Outlook desktop the reply appears and sends normally.
 
 ---
@@ -469,10 +474,12 @@ All three tools take the same target fields:
 |-----------|------|----------|-------------|
 | `draftId` | string | Yes | Microsoft Graph message ID of the draft: `openEmailParams.id` from a `search_emails` result with `isDraft: true`, or the `draftId` returned by `draft_email`. |
 | `idIsImmutable` | boolean | No | `openEmailParams.idIsImmutable` from the search result, or the `idIsImmutable` returned by `draft_email`. |
-| `mailbox` | string (UPN) | No | Shared mailbox that holds the draft (`openEmailParams.mailbox` when set). Omit for the signed-in user's own mailbox. |
+| `mailbox` | string (UPN) | No | Shared mailbox that holds the draft (`openEmailParams.mailbox` when set). Omit for the signed-in user's own mailbox. With `DELEGATED_ACCESS_SCAN=disabled`, any mailbox other than the user's own is refused. |
 | `parentFolderId` | string | No | `openEmailParams.parentFolderId` from the search result when set. Without it, a `mailbox` draft is reached through `/users/{mailbox}/messages/{id}`, which Microsoft Graph refuses when access to the shared mailbox is granted per folder. With it, every request goes through `/users/{mailbox}/mailFolders/{parentFolderId}/messages/{id}`. |
 
 Before changing anything, every tool reads the message from Microsoft Graph and refuses — leaving it untouched — when it is no longer a draft (for example because it was already sent) or cannot be read.
+
+With `DELEGATED_ACCESS_SCAN=disabled` the server works with the signed-in user's own mailbox only. A `mailbox` other than the user's own email address or user principal name (compared case-insensitively) returns `success: false` with a message, before any Microsoft Graph call. See [Configuration — DELEGATED_ACCESS_SCAN](../operator/configuration.md#DELEGATED_ACCESS_SCAN).
 
 ### `update_draft_email`
 
@@ -616,7 +623,7 @@ List all Outlook mail categories available for the user.
 
 ### `list_mailboxes_and_directories`
 
-List all Outlook mailboxes and their folder trees available to the user.
+List all Outlook mailboxes and their folder trees available to the user. With `DELEGATED_ACCESS_SCAN=disabled` only the user's own mailbox is listed, and search covers only that mailbox.
 
 **Available in:** Both modes
 
@@ -645,17 +652,17 @@ List all Outlook mailboxes and their folder trees available to the user.
 **Usage notes:**
 
 - Folder `id` values can be passed to the `directories` filter in `search_emails` to narrow results to a specific folder.
-- In Mode A, the folder tree is synced from Microsoft Graph and reflects the user's current mailbox structure. Calling this tool triggers a fresh sync of the folder tree.
-- Folder filtering via `directories` is only effective in Mode A (`microsoft_graph_and_unique_api`). In Mode B, the Microsoft Graph Search API does not support folder-scoped filtering — the `directories` condition is ignored.
+- The folder tree is synced from Microsoft Graph and reflects the user's current mailbox structure. Calling this tool syncs the caller's folder tree first, in both modes.
+- Folder filtering via `directories` works in both modes. In Mode B it narrows each KQL query in `msGraphKeywordSearchQueries` to the listed folders.
 - Well-known system folder names (`"Inbox"`, `"Sent Items"`, `"Drafts"`, etc.) can be used directly in `search_emails` without calling this tool first.
-- When `DELEGATED_ACCESS_SCAN` is enabled, the `mailboxes` array includes delegated mailboxes alongside the user's own mailbox. The `isOwn` field is `true` for the user's primary mailbox and `false` for delegated ones. Folder IDs from delegated mailboxes can be passed to the `directories` condition in `search_emails` to narrow results to a specific folder in a delegated mailbox (folder filtering via `directories` is only effective in Mode A).
+- When `DELEGATED_ACCESS_SCAN` is enabled, the `mailboxes` array includes delegated mailboxes alongside the user's own mailbox. The `isOwn` field is `true` for the user's primary mailbox and `false` for delegated ones. Folder IDs from delegated mailboxes can be passed to the `directories` condition in `search_emails` to narrow results to a specific folder in a delegated mailbox.
 
 ---
 
 ## Subscription Management
 
 !!! note "Mode A (`microsoft_graph_and_unique_api`) only"
-    `verify_inbox_connection`, `reconnect_inbox`, and `delete_inbox_data` are only available when `MCP_BACKEND=microsoft_graph_and_unique_api`. These tools are not registered in `microsoft_graph` mode because no webhook subscriptions are created.
+    `verify_inbox_connection`, `reconnect_inbox`, and `delete_inbox_data` are only available when `MCP_BACKEND=microsoft_graph_and_unique_api`. They cannot be listed in `MCP_TOOLS` in `microsoft_graph` mode because no webhook subscriptions are created.
 
 ### `verify_inbox_connection`
 
@@ -805,10 +812,10 @@ Check the current state of the full email sync and live catch-up pipeline. Call 
 
 ## Debug-Mode Tools
 
-The following four tools are only available when `MCP_DEBUG_MODE=enabled` is set in the server configuration. They are intended for operators diagnosing sync issues, not for end users.
+The following tools are only available when `MCP_DEBUG_MODE=enabled` is set in the server configuration and the tool is listed in `MCP_TOOLS`. They are intended for operators diagnosing sync issues, not for end users.
 
 !!! note "Mode A (`microsoft_graph_and_unique_api`) only"
-    These tools are only available when `MCP_BACKEND=microsoft_graph_and_unique_api` AND `MCP_DEBUG_MODE=enabled`.
+    These tools are only available when `MCP_BACKEND=microsoft_graph_and_unique_api` AND `MCP_DEBUG_MODE=enabled`, and only when listed in `MCP_TOOLS`.
 
 ### `run_full_sync`
 
@@ -856,13 +863,30 @@ Restart the full sync from scratch, discarding all previous progress.
 
 ---
 
+### `admin_ops`
+
+Run a diagnostic on the caller's own mailbox. Its description tells the AI assistant not to call it; an operator calls it directly.
+
+**Input parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `tool` | object | Yes | The operation: `{ type: "sync_diagnostics", params: {} }` or `{ type: "search_recall_check", params: { cases } }` |
+
+- **`sync_diagnostics`** compares the messages in Microsoft Graph with the files ingested into the Unique knowledge base. It returns `messageIdsSkippedBecauseOfFilters`, `messageIdsFoundInMicrosoftButNotFoundInUnique` and `messageIdsFoundInUniqueButNotFoundInMicrosoft`.
+- **`search_recall_check`** takes 1 to 20 `cases`, each `{ id, graphFilter?, graphSearch?, search }`. For each case it lists the messages Microsoft Graph returns for `graphFilter` or `graphSearch`, runs `search` as `search_emails` would, and reports which Graph messages the search missed. Each result has `id`, `checkStatus` (`success` or `failure`), `accuracy`, `stats` (`graphEmailsCount`, `searchEmailsCount`, `missedEmailsCount`, `foundEmailsCount`) and, on failure, `missedMessages` with whether each missed message exists in Unique and its ingestion state.
+
+**Usage notes:** Read-only. Both operations read the user's mailbox and the Unique knowledge base.
+
+---
+
 ## Calendar
 
-**Available in:** Both modes, only when `CALENDAR_INTEGRATION=enabled`. Live Graph query-through — no calendar ingest, webhooks, or calendar tables. Shared-mailbox **profiles** never call these tools.
+**Available in:** Both modes, only for the calendar tools listed in `MCP_TOOLS`. Live Graph query-through — no calendar ingest, webhooks, or calendar tables. Shared-mailbox **profiles** never call these tools.
 
 `respond_to_invite` notifies the organizer immediately — there is no confirmation prompt. `create_event`, `update_event`, and `cancel_event` notify other people after in-chat confirmation. There is no draft state. Confirmation is Accept / Decline on the prompt — there is no extra checkbox. For a recurring `update_event` or `cancel_event`, the prompt also asks this occurrence or the entire series. `cancel_event` notifies attendees; it is not a silent delete.
 
-If a calendar tool returns `consentRequired: true`, Graph denied calendar permission on the signed-in user's own mailbox (usually missing `Calendars.ReadWrite.Shared`). Ask the user to reconnect Outlook so they run Microsoft OAuth again. Do not call `reconnect_inbox` — that only renews the mail webhook. Do not send them to `/auth/authorize` — that is the MCP OAuth start URL for clients, not a user reconnect. See [Configuration — CALENDAR_INTEGRATION](../operator/configuration.md#CALENDAR_INTEGRATION) and [Permissions](./permissions.md).
+If a calendar tool returns `consentRequired: true`, Graph denied calendar permission on the signed-in user's own mailbox (usually missing `Calendars.ReadWrite.Shared`). Ask the user to reconnect Outlook so they run Microsoft OAuth again. Do not call `reconnect_inbox` — that only renews the mail webhook. Do not send them to `/auth/authorize` — that is the MCP OAuth start URL for clients, not a user reconnect. See [Configuration — Calendar tools](../operator/configuration.md#Calendar-tools) and [Permissions](./permissions.md).
 
 Do not display `calendarRef`, `eventRef`, `calendarId`, or `eventId`. Pass `calendarRef` (from `list_calendars`) and `eventRef` (from `search_calendar_events`) through unchanged — never assemble one from parts.
 
@@ -1144,4 +1168,4 @@ Shared-calendar create: `list_calendars`, then pass that `calendarRef` unchanged
 - [Flows](./flows.md) - Sequence diagrams for OAuth, sync, and draft creation flows
 - [Permissions](./permissions.md) - Microsoft Graph permissions required by these tools
 - [Features — Calendar](./features.md#Calendar) - What is supported, what is not
-- [Configuration — CALENDAR_INTEGRATION](../operator/configuration.md#CALENDAR_INTEGRATION) - Operator enablement and re-consent
+- [Configuration — Calendar tools](../operator/configuration.md#Calendar-tools) - Operator enablement and re-consent

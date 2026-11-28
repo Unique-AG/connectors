@@ -13,6 +13,7 @@ import { convertDateTimeToTimezone } from '~/utils/convert-datetime-to-timezone'
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { subjectOrFallback } from '~/utils/no-subject';
 import { Nullish } from '~/utils/nullish';
+import { SensitivityFilter, SensitivityJudgement, SensitivityVerdict } from '../sensitivity-filter';
 
 const recipientSchema = z.object({
   emailAddress: z.object({ address: z.string() }).optional(),
@@ -41,6 +42,7 @@ const graphMessageSchema = z.object({
     .nullish()
     .transform((attachments) => attachments ?? []),
   'attachments@odata.nextLink': z.string().optional(),
+  singleValueExtendedProperties: z.unknown().optional(),
 });
 
 export interface OpenEmailResult {
@@ -61,6 +63,11 @@ export interface OpenEmailResult {
   chunks?: string;
 }
 
+// A message the sensitivity filter withholds. Its content is not returned to the agent.
+export interface WithheldEmail {
+  withheld: Exclude<SensitivityJudgement, { verdict: SensitivityVerdict.Allowed }>;
+}
+
 @Injectable()
 export class OpenEmailQuery {
   private readonly logger = new Logger(this.constructor.name);
@@ -70,6 +77,7 @@ export class OpenEmailQuery {
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
     private readonly getUserProfileQuery: GetUserProfileQuery,
     private readonly buildWebLinksCommand: BuildWebLinksCommand,
+    private readonly sensitivityFilter: SensitivityFilter,
   ) {}
 
   @Span()
@@ -93,7 +101,7 @@ export class OpenEmailQuery {
     uniqueContentId?: string;
     chunkIds?: string[];
     outputTimeZone?: string;
-  }): Promise<OpenEmailResult> {
+  }): Promise<OpenEmailResult | WithheldEmail> {
     const message = await this.readMessageFromMsGraph(
       userProfileId,
       id,
@@ -103,7 +111,7 @@ export class OpenEmailQuery {
       bodyContentType === 'html' ? 'html' : 'text',
       outputTimeZone,
     );
-    if (!uniqueContentId) {
+    if ('withheld' in message || !uniqueContentId) {
       return message;
     }
     try {
@@ -127,7 +135,7 @@ export class OpenEmailQuery {
     idIsImmutable?: boolean,
     bodyContentType: 'text' | 'html' = 'text',
     outputTimeZone?: string,
-  ): Promise<OpenEmailResult> {
+  ): Promise<OpenEmailResult | WithheldEmail> {
     const client = this.graphClientFactory.createClientForUser(userProfileId.toString());
     const messagePath = graphMessagePath({ messageId, mailbox, folderId });
     const immutableIdHeader = idIsImmutable ? ', IdType="ImmutableId"' : '';
@@ -137,10 +145,25 @@ export class OpenEmailQuery {
       .select(
         'id,subject,body,from,toRecipients,ccRecipients,receivedDateTime,parentFolderId,webLink,hasAttachments,isDraft',
       )
-      .expand('attachments($select=name,size,isInline)')
+      .expand(
+        [
+          'attachments($select=name,size,isInline)',
+          ...(this.sensitivityFilter.isActive ? [this.sensitivityFilter.expand] : []),
+        ].join(','),
+      )
       .get();
 
     const message = graphMessageSchema.parse(raw);
+    const sensitivity = this.sensitivityFilter.judge(message.singleValueExtendedProperties);
+    if (sensitivity.verdict !== SensitivityVerdict.Allowed) {
+      if (sensitivity.verdict === SensitivityVerdict.Unreadable) {
+        this.logger.warn({
+          msg: 'Withheld a message whose sensitivity could not be read',
+          userProfileId: userProfileId.toString(),
+        });
+      }
+      return { withheld: sensitivity };
+    }
     if (message['attachments@odata.nextLink'] !== undefined) {
       this.logger.warn({
         msg: 'Microsoft Graph returned only part of the attachments of the message',

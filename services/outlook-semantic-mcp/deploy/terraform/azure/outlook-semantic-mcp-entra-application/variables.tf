@@ -75,20 +75,58 @@ variable "confidential_clients" {
   }
 }
 
-variable "calendar_integration" {
+variable "tools_preset" {
   description = <<-EOT
-    When 'enabled', register Calendars.ReadWrite.Shared on the Entra app and include it in
-    the consent grant. Must match CALENDAR_INTEGRATION on the running service, which uses
-    the same 'enabled' / 'disabled' vocabulary. Default 'disabled' keeps mail-only app
-    registrations unchanged. Enabling calendar still requires this apply before flipping
-    the Helm/env flag, otherwise token refresh requests a scope the app does not expose.
+    The tools the running service lists in MCP_TOOLS, as a list of groups: mail, calendar, sync,
+    debug. The union of their tools is used. Set this or tools_enabled, not both. With neither,
+    the mail tools are used, which registers what earlier versions of this module did. The sync
+    and debug tools need no permission beyond the mail ones.
   EOT
-  type        = string
-  default     = "disabled"
+  type        = list(string)
+  default     = null
 
   validation {
-    condition     = contains(["enabled", "disabled"], var.calendar_integration)
-    error_message = "The calendar_integration must be one of: 'enabled', or 'disabled'."
+    condition     = var.tools_preset == null || (length(coalesce(var.tools_preset, [])) > 0 && alltrue([for name in coalesce(var.tools_preset, []) : contains(keys(local.presets), name)]))
+    error_message = "tools_preset names no group, or one this service does not have. Valid groups: ${join(", ", sort(keys(local.presets)))}."
+  }
+}
+
+variable "tools_enabled" {
+  description = <<-EOT
+    The tools the running service lists in MCP_TOOLS, as a list of tool names, for a selection no
+    group covers. Set this or tools_preset, not both.
+  EOT
+  type        = list(string)
+  default     = null
+
+  validation {
+    condition     = !(var.tools_preset != null && var.tools_enabled != null)
+    error_message = "tools_preset and tools_enabled are alternatives and both are set: remove one."
+  }
+
+  validation {
+    condition     = var.tools_enabled == null || length(coalesce(var.tools_enabled, [])) > 0
+    error_message = "tools_enabled is set but names no tool. List the tools of MCP_TOOLS, or set tools_preset."
+  }
+
+  validation {
+    condition     = var.tools_enabled == null || length(setsubtract(toset(coalesce(var.tools_enabled, [])), toset(local.tool_names))) == 0
+    error_message = "tools_enabled names ${join(", ", sort(setsubtract(toset(coalesce(var.tools_enabled, [])), toset(local.tool_names))))}, which this service has no tool for. Its tools are: ${join(", ", local.tool_names)}."
+  }
+}
+
+variable "delegated_access_scan" {
+  description = <<-EOT
+    The running service's DELEGATED_ACCESS_SCAN. Anything but 'disabled' turns shared mailboxes on,
+    which registers User.Read.All and the .Shared counterpart of each mail permission. The default
+    registers what earlier versions of this module did.
+  EOT
+  type        = string
+  default     = "full_access_only"
+
+  validation {
+    condition     = contains(["disabled", "full_access_only", "granular_access"], var.delegated_access_scan)
+    error_message = "delegated_access_scan must be one of: 'disabled', 'full_access_only', or 'granular_access'."
   }
 }
 
@@ -96,8 +134,9 @@ variable "service_principal_configuration" {
   description = <<-EOT
     Configuration for the service principal. Set to null to skip service principal creation
     (useful in cross-tenant scenarios where the customer tenant manages the service principal).
-    When set (even to {}), creates a service principal and grants admin consent for all
-    Microsoft Graph delegated scopes on behalf of all users in the tenant.
+    When set (even to {}), creates a service principal and grants admin consent for the
+    Microsoft Graph delegated scopes the tool selection registers, on behalf of all users in
+    the tenant.
     For multi-tenant apps, each customer tenant admin must grant consent separately
     (via the admin consent URL or interactive flow).
   EOT

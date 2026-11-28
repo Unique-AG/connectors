@@ -5,6 +5,7 @@ import type { AuthConfigNamespaced } from './auth.config';
 import type { DatabaseConfigNamespaced } from './database.config';
 import { DelegatedAccessConfigNamespaced } from './delegated-access.config';
 import type { EncryptionConfigNamespaced } from './encryption.config';
+import type { FeaturesConfigNamespaced } from './features.config';
 import { IngestionConfigNamespaced } from './ingestion.config';
 import type { MicrosoftConfigNamespaced } from './microsoft.config';
 import type { RateLimitConfigNamespaced } from './rate-limit.config';
@@ -16,10 +17,13 @@ export * from './auth.config';
 export * from './database.config';
 export * from './delegated-access.config';
 export * from './encryption.config';
+export * from './features.config';
+export * from './graph-permissions';
 export * from './ingestion.config';
 export * from './mcp-backend-type.config';
 export * from './microsoft.config';
 export * from './rate-limit.config';
+export * from './tool-declarations';
 export * from './unique.config';
 
 export type ConfigNamespaced = AMQPConfigNamespaced &
@@ -27,6 +31,7 @@ export type ConfigNamespaced = AMQPConfigNamespaced &
   AuthConfigNamespaced &
   DatabaseConfigNamespaced &
   EncryptionConfigNamespaced &
+  FeaturesConfigNamespaced &
   MicrosoftConfigNamespaced &
   RateLimitConfigNamespaced &
   UniqueConfigNamespaced &

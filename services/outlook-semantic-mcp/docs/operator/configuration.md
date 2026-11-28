@@ -5,28 +5,28 @@
 
 The server supports two deployment modes controlled by `MCP_BACKEND`. **Choose your mode before configuring anything else** — it determines which infrastructure components you need and which configuration sections apply.
 
-| | `microsoft_graph_and_unique_api` (default) | `microsoft_graph` |
+| | `microsoft_graph_and_unique_api` (chart default) | `microsoft_graph` |
 |---|---|---|
 | Search | Semantic (Unique KB) + KQL (Graph), merged | KQL (Graph) only |
 | Ingestion | Full sync + live catch-up | None |
-| Tools | 10 standard + 4 debug; +8 when `CALENDAR_INTEGRATION` is enabled | 6 standard; +8 when `CALENDAR_INTEGRATION` is enabled |
-| Requires Unique KB | Yes | Yes |
+| Tools | Those listed in `MCP_TOOLS`, from 10 mail, 4 sync, 5 debug and 8 calendar tools | Those listed in `MCP_TOOLS`, from 10 mail and 8 calendar tools |
+| Requires Unique KB | Yes | Only with `UNIQUE_ATTACHMENTS=enabled` (the default) |
 | Requires RabbitMQ | Yes | Yes |
-| Folder filtering | Supported | Not supported |
+| Folder filtering | Supported | Supported (KQL search, through `directories`) |
 
 **Configuration impact:**
 
 | Section | Mode A (`microsoft_graph_and_unique_api`) | Mode B (`microsoft_graph`) |
 |---|---|---|
-| Required Secrets | All secrets | Same — `UNIQUE_ZITADEL_CLIENT_SECRET` only needed for `external` auth |
+| Required Secrets | All secrets | Same, except `UNIQUE_ZITADEL_CLIENT_SECRET`: needed for `external` auth, and only with `UNIQUE_ATTACHMENTS=enabled` |
 | Ingestion Configuration (`mcpConfig.ingestion`) | Required | **Omit entirely** |
 
 Two values are accepted for `MCP_BACKEND`:
 
-- **`microsoft_graph_and_unique_api`** (default) — dual backend mode. Emails are ingested into the Unique Knowledge Base via the full sync pipeline; `search_emails` runs both Microsoft Graph KQL search and Unique KB semantic search in parallel and merges the results; all sync tools (`sync_progress`, `run_full_sync`, etc.) are registered. Requires the `mcpConfig.ingestion` section to be configured.
-- **`microsoft_graph`** — lean mode. No ingestion pipeline is started; `search_emails` and `open_email` call the Microsoft Graph Search API directly. Sync tools (`sync_progress`, `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`) are not registered. Folder filtering is not supported because the Graph Search API does not expose a folder-scoped KQL predicate. The `mcpConfig.ingestion` section is not required and is ignored.
+- **`microsoft_graph_and_unique_api`** (chart default) — dual backend mode. Emails are ingested into the Unique Knowledge Base via the full sync pipeline; `search_emails` runs both Microsoft Graph KQL search and Unique KB semantic search in parallel and merges the results; the sync tools (`sync_progress`, `run_full_sync`, etc.) can be listed in [`MCP_TOOLS`](#MCP_TOOLS). Requires the `mcpConfig.ingestion` section to be configured.
+- **`microsoft_graph`** — lean mode. No ingestion pipeline is started; `search_emails` and `open_email` call the Microsoft Graph Search API directly. Sync tools (`sync_progress`, `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`) are not available; the server refuses to start when [`MCP_TOOLS`](#MCP_TOOLS) lists one. The `mcpConfig.ingestion` section is not required and is ignored.
 
-Existing deployments that do not set this variable are unaffected — `microsoft_graph_and_unique_api` is the default.
+The Helm chart sets `microsoft_graph_and_unique_api` by default. The service itself has no default, so set `MCP_BACKEND` when running it outside the chart.
 
 ## Environment Variables
 
@@ -44,7 +44,7 @@ These must be provided via Kubernetes secrets:
 | `MICROSOFT_WEBHOOK_SECRET` | 128-character hex string | Webhook validation secret | Both modes |
 | `AUTH_HMAC_SECRET` | 64-character hex string | HMAC-SHA256 session state signing key | Both modes |
 | `ENCRYPTION_KEY` | 64-character hex string | AES-256-GCM token encryption key | Both modes |
-| `UNIQUE_ZITADEL_CLIENT_SECRET` | String | Zitadel OAuth client secret | `external` service auth only |
+| `UNIQUE_ZITADEL_CLIENT_SECRET` | String | Zitadel OAuth client secret | `external` service auth, when Unique is needed |
 | `PROXY_PASSWORD` | String | Proxy password. Inline value or `os.environ/ENV_VAR_NAME`. | `username_password` proxy auth only |
 
 **Connection string formats:**
@@ -81,21 +81,26 @@ Set via `mcpConfig.microsoft` in Helm values:
 | `MICROSOFT_ADMIN_CONSENT_REDIRECT_URI` | `adminConsentRedirectUri` | `https://www.unique.ai/setup/consent-completed/entra-id` | Where Microsoft Entra sends a tenant admin after they grant admin consent through `/admin/consent`. Must be registered as a redirect URI on the app registration |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | `publicWebhookUrl` | defaults to `SELF_URL` | Base URL for Microsoft Graph webhook callbacks — see [MICROSOFT_PUBLIC_WEBHOOK_URL](#MICROSOFT_PUBLIC_WEBHOOK_URL) |
 | `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` | `subscriptionExpirationTimeHoursUTC` | `3` | UTC hour (0–23) when daily subscription renewals run |
+| `MICROSOFT_OFFLINE_ACCESS` | `offlineAccess` | `enabled` | Whether sign-in requests `offline_access` — see [MICROSOFT_OFFLINE_ACCESS](#MICROSOFT_OFFLINE_ACCESS) |
+| `MICROSOFT_PROFILE_SCOPES` | `profileScopes` | `enabled` | Whether sign-in requests `profile` and `email`. `openid` is always requested. The server reads the user's profile from Microsoft Graph `GET /me`, not from the ID token these scopes shape, so `disabled` changes nothing it stores |
 
 ### Unique API Configuration
 
-Set via `mcpConfig.unique` in Helm values:
+Set via `mcpConfig.unique` in Helm values.
+
+The server talks to Unique only when an enabled feature needs it: `MCP_BACKEND=microsoft_graph_and_unique_api`, or `UNIQUE_ATTACHMENTS=enabled`. Otherwise it does not read the other `UNIQUE_*` variables, the chart does not render them, and the server makes no call to Unique. With `MCP_BACKEND=microsoft_graph`, the folder sync never calls Unique. When Unique is needed and a variable is missing, startup fails and names the variable.
 
 | Variable | Helm key | Default | Description |
 |----------|----------|---------|-------------|
+| `UNIQUE_ATTACHMENTS` | `attachments` | `enabled` | `enabled` lets `draft_email` and `add_attachments_to_draft_email` attach `unique://content/{contentId}` files from the Unique knowledge base. `disabled` accepts only `data:` URIs |
 | `UNIQUE_SERVICE_AUTH_MODE` | `serviceAuthMode` | `cluster_local` | Auth mode: `cluster_local` or `external` |
-| `UNIQUE_INGESTION_SERVICE_BASE_URL` | `ingestionServiceBaseUrl` | (required) | Unique ingestion service endpoint |
-| `UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL` | `scopeManagementServiceBaseUrl` | (required) | Unique scope management service endpoint |
+| `UNIQUE_INGESTION_SERVICE_BASE_URL` | `ingestionServiceBaseUrl` | (required when Unique is needed) | Unique ingestion service endpoint |
+| `UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL` | `scopeManagementServiceBaseUrl` | (required when Unique is needed) | Unique scope management service endpoint |
 | `UNIQUE_STORE_INTERNALLY` | `storeInternally` | `enabled` | Store emails as files in the Knowledge Base — see [UNIQUE_STORE_INTERNALLY](#UNIQUE_STORE_INTERNALLY) |
-| `UNIQUE_SERVICE_EXTRA_HEADERS` | `serviceExtraHeaders` | (required for `cluster_local`) | `x-company-id` and `x-user-id` headers for `cluster_local` mode — see [UNIQUE_SERVICE_EXTRA_HEADERS](#UNIQUE_SERVICE_EXTRA_HEADERS) |
-| `UNIQUE_ZITADEL_CLIENT_ID` | `zitadel.clientId` | (required for `external`) | Zitadel OAuth client ID |
-| `UNIQUE_ZITADEL_OAUTH_TOKEN_URL` | `zitadel.oauthTokenUrl` | (required for `external`) | Zitadel OAuth token URL |
-| `UNIQUE_ZITADEL_PROJECT_ID` | `zitadel.projectId` | (required for `external`) | Zitadel project ID for audience validation |
+| `UNIQUE_SERVICE_EXTRA_HEADERS` | `serviceExtraHeaders` | (required for `cluster_local`, when Unique is needed) | `x-company-id` and `x-user-id` headers for `cluster_local` mode — see [UNIQUE_SERVICE_EXTRA_HEADERS](#UNIQUE_SERVICE_EXTRA_HEADERS) |
+| `UNIQUE_ZITADEL_CLIENT_ID` | `zitadel.clientId` | (required for `external`, when Unique is needed) | Zitadel OAuth client ID |
+| `UNIQUE_ZITADEL_OAUTH_TOKEN_URL` | `zitadel.oauthTokenUrl` | (required for `external`, when Unique is needed) | Zitadel OAuth token URL |
+| `UNIQUE_ZITADEL_PROJECT_ID` | `zitadel.projectId` | (required for `external`, when Unique is needed) | Zitadel project ID for audience validation |
 
 ### Proxy Configuration
 
@@ -182,7 +187,7 @@ Set via `mcpConfig.auth` in Helm values (optional — defaults are suitable for 
 | Variable | Helm key | Default | Description |
 |----------|----------|---------|-------------|
 | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `accessTokenExpiresInSeconds` | `60` | TTL of the short-lived access token issued to MCP clients |
-| `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `refreshTokenExpiresInSeconds` | `2592000` | TTL of the long-lived refresh token issued to MCP clients (30 days) |
+| `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `refreshTokenExpiresInSeconds` | `2592000` | TTL of the long-lived refresh token issued to MCP clients (30 days). At most `3600` with `MICROSOFT_OFFLINE_ACCESS=disabled`, where it is the session length — see [MICROSOFT_OFFLINE_ACCESS](#MICROSOFT_OFFLINE_ACCESS) |
 | `AUTH_DISABLE_RATE_LIMITING` | `disableRateLimiting` | `false` | Emergency switch: skip the rate limit on every OAuth route. Leave off unless rate limiting itself is suspected in an incident |
 
 ### Application Configuration
@@ -193,9 +198,12 @@ Set via `mcpConfig.app` in Helm values:
 |----------|----------|---------|-------------|
 | `SELF_URL` | `selfUrl` | (required) | Public URL of the MCP server, used for OAuth callbacks |
 | `PORT` | — | `9542` | HTTP port the server binds to — see [PORT](#PORT) |
-| `MCP_DEBUG_MODE` | `mcpDebugMode` | `disabled` | Expose debug tools to all connected users. **Do not leave enabled in production** — see [MCP_DEBUG_MODE](#MCP_DEBUG_MODE) |
-| `MCP_BACKEND` | `mcpBackend` | `microsoft_graph_and_unique_api` | Selects the search backend — see [Deployment Modes](#Deployment-Modes) |
-| `CALENDAR_INTEGRATION` | `calendarIntegration` | `disabled` | Enables Outlook calendar tools and requests `Calendars.ReadWrite.Shared` on OAuth and token refresh. Existing users must reconnect unless Entra admin consent already covers that scope — see [CALENDAR_INTEGRATION](#CALENDAR_INTEGRATION) |
+| `MCP_DEBUG_MODE` | `mcpDebugMode` | `disabled` | Adds debug data to tool responses and allows the debug tools in `MCP_TOOLS`. **Do not leave enabled in production** — see [MCP_DEBUG_MODE](#MCP_DEBUG_MODE) |
+| `MCP_BACKEND` | `mcpBackend` | (required; the chart sets `microsoft_graph_and_unique_api`) | Selects the search backend — see [Deployment Modes](#Deployment-Modes) |
+| `MCP_TOOLS` | `tools` | (required) | Non-empty JSON array of the tool names to register. Listing a calendar tool turns calendar on — see [MCP_TOOLS](#MCP_TOOLS) and [Calendar tools](#Calendar-tools) |
+| `DIRECTORY_SYNC_MODE` | `directorySyncMode` | `scheduled` | How the folder cache is refreshed: `scheduled` or `on_demand` — see [DIRECTORY_SYNC_MODE](#DIRECTORY_SYNC_MODE) |
+| `EXCLUDED_SENSITIVITY_LABELS` | `excludedSensitivity.labels` | `[]` | JSON array of Purview sensitivity label ids or names. Mail carrying one is left out — see [Sensitivity exclusions](#Sensitivity-exclusions) |
+| `EXCLUDED_LEGACY_SENSITIVITY` | `excludedSensitivity.legacy` | `[]` | JSON array of legacy Outlook sensitivity flags: `personal`, `private`, `confidential`. Mail flagged with one is left out — see [Sensitivity exclusions](#Sensitivity-exclusions) |
 | `LOGS_BUFFERING` | `app.logsBuffering` | `enabled` | Buffer logs before writing. Set to `disabled` only for startup debugging |
 | `LOGS_DIAGNOSTICS_DATA_POLICY` | `app.logsDiagnosticsDataPolicy` | `conceal` | Controls what diagnostic data is logged: `conceal` hides sensitive data, `disclose` shows full data |
 
@@ -247,7 +255,7 @@ Set via `server.env` in Helm values for plain config, or via `server.envVars` (w
 | `OTEL_METRICS_EXPORTER` | `prometheus` | OpenTelemetry metrics exporter |
 | `OTEL_EXPORTER_PROMETHEUS_HOST` | `0.0.0.0` | Host for the Prometheus metrics scrape endpoint |
 | `OTEL_EXPORTER_PROMETHEUS_PORT` | `51346` | Port for the Prometheus metrics scrape endpoint |
-| `DIRECTORY_SYNC_CRON_SCHEDULE` | `*/5 * * * *` | Cron schedule for directory (folder tree) delta sync. No dedicated `mcpConfig.app` Helm path exists — set via `server.env` |
+| `DIRECTORY_SYNC_CRON_SCHEDULE` | `*/5 * * * *` | Cron schedule for directory (folder tree) delta sync with `DIRECTORY_SYNC_MODE=scheduled`. Helm: `mcpConfig.app.directorySyncCronSchedule` |
 
 ## Helm Values Reference
 
@@ -302,6 +310,21 @@ mcpConfig:
     selfUrl: https://outlook.semantic.mcp.example.com
     mcpDebugMode: disabled
     mcpBackend: microsoft_graph_and_unique_api
+    tools:
+      - list_mailboxes_and_directories
+      - list_categories
+      - draft_email
+      - update_draft_email
+      - add_attachments_to_draft_email
+      - remove_attachments_from_draft_email
+      - lookup_contacts
+      - search_emails
+      - fetch_next_search_pages
+      - open_email
+      - sync_progress
+      - verify_inbox_connection
+      - delete_inbox_data
+      - reconnect_inbox
 
   delegatedAccess:
     scan: disabled
@@ -402,6 +425,17 @@ mcpConfig:
   app:
     selfUrl: https://outlook.semantic.mcp.example.com
     mcpBackend: microsoft_graph
+    tools:
+      - list_mailboxes_and_directories
+      - list_categories
+      - draft_email
+      - update_draft_email
+      - add_attachments_to_draft_email
+      - remove_attachments_from_draft_email
+      - lookup_contacts
+      - search_emails
+      - fetch_next_search_pages
+      - open_email
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"
@@ -515,6 +549,44 @@ This defaults to `SELF_URL`. Set it explicitly only when the externally reachabl
 
 Note: the Entra ID app registration redirect URI must match `SELF_URL/auth/callback`, not this variable.
 
+#### MICROSOFT_OFFLINE_ACCESS
+
+Set via `mcpConfig.microsoft.offlineAccess`. With `enabled` (default), sign-in requests `offline_access`, Microsoft returns a refresh token, and the server uses it to renew the user's Microsoft token and to run background jobs.
+
+With `disabled`, sign-in does not request `offline_access` and the server stores no refresh token. The Microsoft access token lasts about an hour (60 to 90 minutes by default; a tenant policy can shorten it), and nothing renews it. So that the MCP client signs the user in again before it runs out:
+
+- The MCP session ends `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` after sign-in, however active the user is. Refreshing the MCP access token does not extend it. The server refuses to start when that is above `3600`.
+- If Microsoft still rejects the token before then, the server clears the user's Microsoft token, ends their MCP session and answers with the error the MCP client turns into a sign-in prompt.
+
+No background job can run without a refresh token, so `disabled` needs `MCP_BACKEND=microsoft_graph`, [`DIRECTORY_SYNC_MODE=on_demand`](#DIRECTORY_SYNC_MODE) and `DELEGATED_ACCESS_SCAN=disabled`. The server refuses to start otherwise, naming `MICROSOFT_OFFLINE_ACCESS`, and the chart refuses to render.
+
+#### Requested Graph permissions
+
+The server computes the Microsoft Graph permissions it requests from its configuration. The OAuth authorize request, token refresh and the Graph client all use the same list:
+
+1. Always: `openid`, `User.Read` (sign-in) and `Mail.Read` (the folder sync runs for every deployment). Also `profile` and `email` unless [`MICROSOFT_PROFILE_SCOPES`](#Microsoft-Configuration) is `disabled`, and `offline_access` unless [`MICROSOFT_OFFLINE_ACCESS`](#MICROSOFT_OFFLINE_ACCESS) is `disabled`.
+2. Each tool in [`MCP_TOOLS`](#MCP_TOOLS) adds what its Microsoft Graph calls need:
+   - `draft_email`, `update_draft_email`, `add_attachments_to_draft_email` and `remove_attachments_from_draft_email`: `Mail.ReadWrite`.
+   - `lookup_contacts`: `People.Read`.
+   - `list_categories`, `search_emails`, `fetch_next_search_pages` and `open_email`: `MailboxSettings.Read` (categories and the mailbox time zone).
+   - The calendar tools: `Calendars.ReadWrite.Shared`; all but `list_calendars` and `respond_to_invite` also `MailboxSettings.Read`. See [Calendar tools](#Calendar-tools).
+   - The other tools need nothing beyond `Mail.Read`.
+3. `MCP_BACKEND=microsoft_graph_and_unique_api` needs `Mail.Read` for the sync and the mail subscription.
+4. Shared mailboxes, meaning [`DELEGATED_ACCESS_SCAN`](#DELEGATED_ACCESS_SCAN) is anything but `disabled`, add `User.Read.All` and `Mail.Read.Shared`. With a draft tool listed, they add `Mail.ReadWrite.Shared` instead of `Mail.Read.Shared`.
+5. A write permission replaces its read permission: `Mail.ReadWrite` removes `Mail.Read`, and `Mail.ReadWrite.Shared` removes `Mail.Read.Shared`. A permission and its `.Shared` counterpart stay side by side.
+
+The server sends the list sorted. Some selections and what they request:
+
+| Selection | Requested permissions |
+|-----------|-----------------------|
+| The 10 mail tools, or the 14 with the sync tools, and `DELEGATED_ACCESS_SCAN` not `disabled` | `openid profile email offline_access User.Read User.Read.All MailboxSettings.Read Mail.ReadWrite Mail.ReadWrite.Shared People.Read`. This is the fixed list earlier versions always requested |
+| The same, plus calendar tools | The list above plus `Calendars.ReadWrite.Shared` |
+| The 10 mail tools, or the 14 with the sync tools, and `DELEGATED_ACCESS_SCAN=disabled` | `openid profile email offline_access User.Read MailboxSettings.Read Mail.ReadWrite People.Read` |
+| `search_emails`, `fetch_next_search_pages`, `open_email`, `list_mailboxes_and_directories`, `list_categories` and `lookup_contacts`, with `DELEGATED_ACCESS_SCAN=disabled` | `openid profile email offline_access User.Read Mail.Read People.Read MailboxSettings.Read` |
+| The same, with `MICROSOFT_OFFLINE_ACCESS=disabled` and `MICROSOFT_PROFILE_SCOPES=disabled` | `openid User.Read Mail.Read People.Read MailboxSettings.Read` |
+
+Asking Entra for fewer permissions than the app was granted needs no consent. Asking for one the app was not granted does: users see a consent prompt, or need an admin where the tenant disables user consent. The `outlook-semantic-mcp-entra-application` Terraform module registers exactly this list, without `offline_access` and the OpenID scopes, which need no registration. It grants the list tenant-wide unless `service_principal_configuration` is `null`; with `null`, users or an admin consent at sign-in. Give it the same selection through `tools_preset` or `tools_enabled` and `delegated_access_scan` — see [Authentication](./authentication.md). Changing `MCP_TOOLS` or `DELEGATED_ACCESS_SCAN` can change the list, and users then consent to any permission the app was not granted before.
+
 ### Unique API
 
 #### UNIQUE_STORE_INTERNALLY
@@ -538,19 +610,70 @@ Required for `cluster_local` auth mode. Provide as a JSON object:
 
 #### MCP_DEBUG_MODE
 
-When set to `enabled`, exposes four additional debug tools to all connected MCP users: `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync`. These tools are intended for troubleshooting sync issues, but because MCP tools are scoped to the authenticated user there is no way to restrict them to operators only — all users can call them while debug mode is active. Enable only during active troubleshooting and disable immediately after.
+When set to `enabled`, adds debug data to tool responses and allows five debug tools: `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync` and `admin_ops`. It does not register them by itself: a debug tool is registered only when it is also listed in [`MCP_TOOLS`](#MCP_TOOLS), and debug tools also need `MCP_BACKEND=microsoft_graph_and_unique_api`. These tools are intended for troubleshooting sync issues, but because MCP tools are scoped to the authenticated user there is no way to restrict them to operators only — all users can call them while they are registered. Enable only during active troubleshooting and disable immediately after.
 
-#### CALENDAR_INTEGRATION
+#### MCP_TOOLS
 
-Set via `mcpConfig.app.calendarIntegration`. Default `disabled`. When `enabled`, the service registers Outlook calendar tools (`list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event`, `cancel_event`) and appends `Calendars.ReadWrite.Shared` to the Microsoft Graph OAuth and token-refresh scope string. `respond_to_invite` notifies the organizer immediately. `create_event`, `update_event`, and `cancel_event` notify other people after the user confirms. There is no draft state. `cancel_event` notifies attendees; it is not a silent delete.
+Required. Set via `mcpConfig.app.tools`, a YAML list the chart renders as a JSON array. The chart fails to render while the list is empty. Only the listed tools are registered; there is no setting that registers every tool. For example, `["search_emails","fetch_next_search_pages","open_email"]` registers those three tools only.
 
-The Entra app registration is gated separately: the `outlook-semantic-mcp-entra-application` Terraform module only registers `Calendars.ReadWrite.Shared` — and includes it in the tenant-wide delegated permission grant it creates when `service_principal_configuration` is set — when `calendar_integration = "enabled"`. Runtime `getScopes()` still omits the calendar scope until `CALENDAR_INTEGRATION=enabled`.
+Listing at least one calendar tool turns calendar on. See [Calendar tools](#Calendar-tools).
 
-Do this in order. Flipping the runtime flag before Entra has the scope breaks **mail** token refresh (`invalid_grant`).
+The listed tools decide part of the Microsoft Graph permissions the server requests. See [Requested Graph permissions](#Requested-Graph-permissions).
 
-1. Apply Terraform `outlook-semantic-mcp-entra-application` with `calendar_integration = "enabled"`.
+The server refuses to start, naming the tool and the setting, when:
+
+- a listed name is unknown
+- `sync_progress`, `verify_inbox_connection`, `delete_inbox_data` or `reconnect_inbox` is listed and `MCP_BACKEND` is not `microsoft_graph_and_unique_api`
+- a debug tool (`run_full_sync`, `restart_full_sync`, `pause_full_sync`, `resume_full_sync`, `admin_ops`) is listed and `MCP_DEBUG_MODE` is not `enabled`; debug tools also need `MCP_BACKEND=microsoft_graph_and_unique_api`
+
+Tool descriptions and the server instructions still mention other tools by name, including ones a deployment leaves out.
+
+#### DIRECTORY_SYNC_MODE
+
+Set via `mcpConfig.app.directorySyncMode`. The server keeps each user's Outlook folders in a table. `list_mailboxes_and_directories` lists them, and `search_emails` resolves its folder filter (`directories`) from them.
+
+- **`scheduled`** (default) — a scan at startup and a cron job (`DIRECTORY_SYNC_CRON_SCHEDULE`) refresh the folders of every signed-in user and shared mailbox, with the stored Microsoft tokens.
+- **`on_demand`** — no scan at startup and no cron job. The folders are refreshed with the calling user's own token: on every `list_mailboxes_and_directories` call, and before a `search_emails` call with a folder filter when the user's folders were last refreshed over 4 hours ago. Concurrent searches of one user share one refresh. When that refresh fails, the search uses the folders already cached, unless the user's Microsoft sign-in was revoked, and searches in the next 5 minutes do not try it again. The sign-in also refreshes them. A folder created in Outlook is therefore found by a folder filter at the latest 4 hours later, or at once after `list_mailboxes_and_directories`.
+
+`on_demand` needs `MCP_BACKEND=microsoft_graph`, because ingestion syncs the folders itself, and `DELEGATED_ACCESS_SCAN=disabled`, because shared mailbox folders are refreshed only by the scheduled sync. The server refuses to start otherwise, and the chart refuses to render.
+
+#### Sensitivity exclusions
+
+Set via `mcpConfig.app.excludedSensitivity`. Mail with an excluded sensitivity is left out of `search_emails` and `fetch_next_search_pages`, and `open_email` refuses it. Nothing of such a message reaches the agent, not its subject, sender or id. Each message is judged by its own label: an unlabelled reply or forward that quotes a labelled message is returned in full. The agent is told how many results were withheld and under which labels, and that the user can read them in Outlook. With the configuration below, a search that withholds one message labelled with the excluded label id and two flagged private tells the agent:
+
+```text
+3 emails were withheld because of their sensitivity labels ("Private", label id 4f1c2a7e-9b3d-4e85-a6c0-d2b71e93f5a8). Their content cannot be shown here; the user can read them in Outlook. Labels shown by id are excluded by their id, so their names are not known.
+```
+
+`open_email` names the label in the same way. A label is shown as you wrote it in `labels`, never by the name the message carries, because the sender of a received message controls that text. A label you list by id is shown by its id, and the agent is told its name is not known. List a label by name if the agent should be able to name it to the user.
+
+```yaml
+mcpConfig:
+  app:
+    mcpBackend: microsoft_graph
+    excludedSensitivity:
+      labels: [Confidential, 4f1c2a7e-9b3d-4e85-a6c0-d2b71e93f5a8]
+      legacy: [private, confidential]
+```
+
+- **`labels`** (`EXCLUDED_SENSITIVITY_LABELS`) — Microsoft Purview sensitivity labels, each by its id (a GUID, with or without braces) or its name, ignoring case. A message is excluded when one of its labels matches. The message carries the label's id and a name. Which name that is for a sublabel, or for a label whose display name an admin changed, has not been probed; `Get-Label | Format-Table Name, DisplayName, Guid` lists both names and the id. A label id never changes, so list labels by id where the exclusion protects data, and by name only where the agent should be able to name the label.
+- **`legacy`** (`EXCLUDED_LEGACY_SENSITIVITY`) — the sensitivity flag Outlook sets under *Options → Sensitivity*: `personal`, `private` or `confidential`.
+
+The server reads both from each message Microsoft Graph returns, without an extra request: a search asks Graph for the two properties alongside its results, and `open_email` asks for them with the message. A message whose properties Graph does not return, or returns in a form the server cannot read, is left out as well, and the note says its label could not be read. A results page the filter empties still carries its cursor, so `fetch_next_search_pages` continues past it. With both lists empty (the default) the requests to Graph are unchanged and nothing is filtered.
+
+Both settings need `MCP_BACKEND=microsoft_graph`, because semantic search results from the Unique knowledge base carry no sensitivity to filter on. The server refuses to start otherwise, naming the setting, and the chart refuses to render. An unknown legacy flag, a blank label, or a value that is not a JSON array also stops the server at startup. `lookup_contacts`, the draft tools and the calendar tools are not filtered: `search_calendar_events` returns the body of a private or labelled event.
+
+#### Calendar tools
+
+The calendar tools are `list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event` and `cancel_event`. When [`MCP_TOOLS`](#MCP_TOOLS) lists at least one of them, the service registers the listed calendar tools, adds the calendar server instructions, and appends `Calendars.ReadWrite.Shared` to the Microsoft Graph OAuth and token-refresh scope string. When none is listed, calendar is off. `respond_to_invite` notifies the organizer immediately. `create_event`, `update_event`, and `cancel_event` notify other people after the user confirms. There is no draft state. `cancel_event` notifies attendees; it is not a silent delete.
+
+The Entra app registration is gated separately: the `outlook-semantic-mcp-entra-application` Terraform module only registers `Calendars.ReadWrite.Shared` — and includes it in the tenant-wide delegated permission grant it creates unless `service_principal_configuration` is `null` — when its selection includes a calendar tool, e.g. `tools_preset = ["mail", "calendar"]`. Runtime `getScopes()` still omits the calendar scope until `MCP_TOOLS` lists a calendar tool.
+
+Do this in order. Listing a calendar tool before Entra has the scope breaks **mail** token refresh (`invalid_grant`).
+
+1. Apply Terraform `outlook-semantic-mcp-entra-application` with the calendar tools in its selection, e.g. `tools_preset = ["mail", "calendar"]`.
 2. Confirm the Entra app lists that delegated permission.
-3. Set `CALENDAR_INTEGRATION=enabled` (`mcpConfig.app.calendarIntegration`).
+3. Add the calendar tools to `mcpConfig.app.tools` (`MCP_TOOLS`).
 4. Existing connected users must **reconnect Outlook**, unless an Entra admin has already granted the extra scope tenant-wide. `reconnect_inbox` only renews the mail webhook; it does not re-run OAuth. The user has to start a new Outlook connection.
 5. If a calendar tool returns `consentRequired: true`, Graph denied calendar permission on the signed-in user's own mailbox. Ask the user to reconnect Outlook (new Microsoft OAuth). Do not call `reconnect_inbox`. Do not send them to `/auth/authorize` — that is the MCP OAuth start URL for clients, not a user reconnect.
 
@@ -564,15 +687,20 @@ For step-by-step Microsoft 365 setup, see [Features — Delegated Access — Set
 
 Set via `mcpConfig.delegatedAccess.scan`. Controls whether the service scans for delegated mailbox access granted between users at the Microsoft Exchange level. Three values are accepted:
 
-- **`disabled`** (default) — delegated access scanning is off. No discovery or verification runs are scheduled. Users only see their own mailbox.
+- **`disabled`** (default) — delegated access scanning is off. No discovery or verification runs are scheduled. The server works with the signed-in user's own mailbox only. `draft_email`, `update_draft_email`, `add_attachments_to_draft_email`, `remove_attachments_from_draft_email` and `open_email` refuse a `mailbox` other than the user's own email address or user principal name (compared case-insensitively): they return `success: false` with a message, before calling Microsoft Graph. `search_emails` searches only the mailboxes the user can access, so it skips another mailbox.
 - **`full_access_only`** — discovers users who have been granted **Full Access (Read & Manage)** on a mailbox via Exchange admin. Uses the `/users/{email}/messages` endpoint to detect access. Requires `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE`.
 - **`granular_access`** — discovers users who have been granted **folder-level access** (e.g., only "Inbox" or "RFQ" shared, not the entire mailbox). Uses the `/users/{email}/mailFolders` endpoint for discovery, followed by a verification pass to determine which folders are actually readable (since the folder listing can include parent folders of shared subfolders that are not themselves accessible). Requires both `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` and `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE`.
+
+`disabled` adds no shared-mailbox permission. `full_access_only` and `granular_access` add `User.Read.All` and `Mail.Read.Shared`, or `Mail.ReadWrite.Shared` instead of `Mail.Read.Shared` when a draft tool is listed in `MCP_TOOLS`. See [Requested Graph permissions](#Requested-Graph-permissions).
+
+Earlier versions used any `mailbox` passed to those five tools, through `Mail.ReadWrite.Shared`, even with `disabled`. A deployment that drafts in or opens emails from shared mailboxes now sets `full_access_only` or `granular_access`.
 
 **Choosing a mode:**
 
 | Scenario | Recommended mode |
 |----------|-----------------|
 | No delegated mailbox access in your org | `disabled` |
+| Users draft in or open emails from shared mailboxes | `full_access_only`, or `granular_access` for folder-level access |
 | Users have Full Access (Read & Manage) granted via Exchange admin | `full_access_only` |
 | Users share individual folders (e.g., Inbox, RFQ) with others | `granular_access` |
 

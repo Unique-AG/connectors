@@ -62,6 +62,12 @@ export const mcpOAuthModuleOptionsSchema = z.object({
     .number()
     .prefault(30 * 24 * 60 * 60)
     .describe('The expiration time of the JWT refresh token. Default is 30 days.'),
+  refreshTokenExpiry: z
+    .enum(['sliding', 'absolute'])
+    .prefault('sliding')
+    .describe(
+      'sliding: each rotation gives the new refresh token the full refreshTokenExpiresIn. absolute: the new refresh token keeps the expiry of the one it replaces, so a session ends refreshTokenExpiresIn after sign-in however active it is, and no access token outlives it.',
+    ),
 
   disableRateLimiting: z
     .boolean()

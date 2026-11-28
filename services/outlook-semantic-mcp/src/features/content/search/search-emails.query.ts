@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { omit, sum, unique } from 'remeda';
+import { Inject, Injectable } from '@nestjs/common';
+import { isNonNullish, omit, sum, unique } from 'remeda';
+import { type FeaturesConfig, featuresConfig, McpBackendType } from '~/config';
+import { RefreshStaleDirectoriesCommand } from '~/features/directories-sync/refresh-stale-directories.command';
 import { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
-import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { Nullish } from '~/utils/nullish';
 import {
@@ -35,6 +36,8 @@ export class SearchEmailsQuery {
     private readonly msGraphKqlQuery: MsGraphKqlSearchEmailsQuery,
     private readonly getMailboxTimezoneQuery: GetMailboxTimezoneQuery,
     private readonly searchCursorRepository: SearchCursorRepository,
+    private readonly refreshStaleDirectoriesCommand: RefreshStaleDirectoriesCommand,
+    @Inject(featuresConfig.KEY) private readonly features: FeaturesConfig,
   ) {}
 
   public async run(
@@ -42,10 +45,15 @@ export class SearchEmailsQuery {
     input: SearchEmailsToolInput,
   ): Promise<SearchEmailsOutput> {
     const outputTimeZone = await this.getMailboxTimezoneQuery.run(userProfileId);
-    const semanticQueries = isMicrosoftGraphBackend()
-      ? []
-      : (input.uniqueSemanticSearchQueries ?? []);
+    const semanticQueries =
+      this.features.mode === McpBackendType.MicrosoftGraph
+        ? []
+        : (input.uniqueSemanticSearchQueries ?? []);
     const kqlQueries = input.msGraphKeywordSearchQueries ?? [];
+    // On-demand folder sync runs only with the Graph backend, so only KQL queries filter by folder.
+    if (kqlQueries.some((query) => isNonNullish(query.directories))) {
+      await this.refreshStaleDirectoriesCommand.run(userProfileId);
+    }
 
     // Every query gets an equal share of the response budget. A semantic search uses its share as
     // its page size. The KQL queries pool what the semantic searches leave and split it across

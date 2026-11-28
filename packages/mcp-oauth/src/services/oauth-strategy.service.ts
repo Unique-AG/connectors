@@ -12,7 +12,8 @@ export const STRATEGY_NAME = 'oauth-provider';
 export interface PassportUser {
   profile: OAuthUserProfile;
   accessToken: string;
-  refreshToken: string;
+  /** Absent when the provider issued none, e.g. Microsoft without the `offline_access` scope. */
+  refreshToken?: string;
   provider: string;
 }
 
@@ -50,7 +51,7 @@ export class OAuthStrategyService implements OnModuleInit {
       strategyOptions,
       (
         accessToken: string,
-        refreshToken: string,
+        refreshToken: string | undefined,
         profile: unknown,
         done: (error: unknown, user: unknown, info?: { message: string }) => void,
       ) => {

@@ -85,13 +85,21 @@ export class OpaqueTokenService {
     userProfileId: string,
     familyId?: string | null,
     generation = 0,
+    // Set on rotation with absolute expiry: the expiry of the refresh token being replaced.
+    sessionExpiresAt?: Date,
   ): Promise<TokenPair> {
     const accessToken = this.generateSecureToken(this.ACCESS_TOKEN_BYTES);
     const refreshToken = this.generateSecureToken(this.REFRESH_TOKEN_BYTES);
 
     const now = Date.now();
-    const accessExpiresAt = new Date(now + this.options.accessTokenExpiresIn * 1000);
-    const refreshExpiresAt = new Date(now + this.options.refreshTokenExpiresIn * 1000);
+    const refreshExpiresAt =
+      sessionExpiresAt ?? new Date(now + this.options.refreshTokenExpiresIn * 1000);
+    const accessLifetimeEnd = now + this.options.accessTokenExpiresIn * 1000;
+    const accessExpiresAt = new Date(
+      this.options.refreshTokenExpiry === 'absolute'
+        ? Math.min(accessLifetimeEnd, refreshExpiresAt.getTime())
+        : accessLifetimeEnd,
+    );
 
     const tokenFamilyId = familyId || typeid('tkfam').toString();
 
@@ -126,7 +134,7 @@ export class OpaqueTokenService {
       access_token: accessToken,
       refresh_token: refreshToken,
       token_type: 'Bearer',
-      expires_in: this.options.accessTokenExpiresIn,
+      expires_in: Math.ceil((accessExpiresAt.getTime() - now) / 1000),
       scope,
     };
   }
@@ -217,6 +225,7 @@ export class OpaqueTokenService {
       metadata.userProfileId,
       familyId,
       (metadata.generation || 0) + 1,
+      this.options.refreshTokenExpiry === 'absolute' ? metadata.expiresAt : undefined,
     );
 
     // The used row is kept until it expires, so a later replay is still recognised as one.

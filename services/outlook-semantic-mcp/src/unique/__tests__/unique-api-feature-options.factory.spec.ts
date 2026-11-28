@@ -17,6 +17,7 @@ describe('uniqueApiFeatureOptionsFactory', () => {
     get: vi.fn((key: string) => {
       if (key === 'unique') {
         return {
+          enabled: true,
           serviceAuthMode: 'external',
           ingestionServiceBaseUrl: 'https://ingestion.example',
           scopeManagementServiceBaseUrl: 'https://scope.example',
@@ -36,6 +37,7 @@ describe('uniqueApiFeatureOptionsFactory', () => {
     configService.get.mockImplementation((key: string) => {
       if (key === 'unique') {
         return {
+          enabled: true,
           serviceAuthMode: 'external',
           ingestionServiceBaseUrl: 'https://ingestion.example',
           scopeManagementServiceBaseUrl: 'https://scope.example',

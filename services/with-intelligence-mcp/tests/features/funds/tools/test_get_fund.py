@@ -54,6 +54,7 @@ class TestProjection:
         result = await get_fund(fund_id=8677, client=client)
         assert isinstance(result, FundProfileResponse)
         assert result.manager == "Example Manager"
+        assert result.url == "https://platform.withintelligence.com/explore/funds/8677"
         assert result.status == "Active"
         assert result.sub_status == "Open to investment"
         assert result.is_liquidated is False

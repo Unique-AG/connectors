@@ -36,6 +36,7 @@ describe('RemoveAttachmentsFromDraftEmailTool', () => {
     tool = new RemoveAttachmentsFromDraftEmailTool(
       getDraftStateQuery as never,
       removeCommand as never,
+      { run: vi.fn().mockResolvedValue({ allowed: true }) } as never,
     );
   });
 

@@ -35,6 +35,7 @@ async def rescreen_case(
         Field(description="True screens changes since the last run. False screens fully."),
     ] = False,
     limit: PageSize = 20,
+    *,
     upstream: Upstream = Depends(get_upstream),
 ) -> contexts.ScreeningOutcome:
     try:

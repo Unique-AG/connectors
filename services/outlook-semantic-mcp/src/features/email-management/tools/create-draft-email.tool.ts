@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { isString } from 'remeda';
 import * as z from 'zod';
+import { CheckMailboxAccessQuery } from '~/features/user-utils/check-mailbox-access.query';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { CreateDraftEmailCommand } from '../create-draft-email.command';
 import { DraftAttachmentsSchema, DraftRecipientsSchema } from '../draft-input.schemas';
@@ -96,7 +97,10 @@ const CreateDraftEmailOutputSchema = z.object({
 
 @Injectable()
 export class CreateDraftEmailTool {
-  public constructor(private readonly createDraftEmailCommand: CreateDraftEmailCommand) {}
+  public constructor(
+    private readonly createDraftEmailCommand: CreateDraftEmailCommand,
+    private readonly checkMailboxAccessQuery: CheckMailboxAccessQuery,
+  ) {}
 
   @Tool({
     name: 'draft_email',
@@ -121,6 +125,10 @@ export class CreateDraftEmailTool {
     request: McpAuthenticatedRequest,
   ) {
     const userProfileId = extractUserProfileId(request);
+    const mailboxAccess = await this.checkMailboxAccessQuery.run(userProfileId, input.mailbox);
+    if (!mailboxAccess.allowed) {
+      return { success: false, message: mailboxAccess.message };
+    }
     const chatId = _context.mcpRequest.params._meta?.chatId;
     const result = await this.createDraftEmailCommand.run(userProfileId, {
       ...input,

@@ -56,7 +56,7 @@ envVars: []
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/outlook-semantic-mcp
-  tag: 5.1.0 # x-release-please-version
+  tag: 6.0.0 # x-release-please-version
   pullPolicy: IfNotPresent
 
 ports:
@@ -301,19 +301,30 @@ mcpConfig:
     # The URL must be reachable from the redirect location, e.g. must be publicly accessible.
     # example: https://outlook.mcp.unique.app
     selfUrl: '{{ fail "mcpConfig.app.selfUrl is mandatory. Override in your deployment values." }}'
-    # -- Debug mode for the MCP server. Set to "enabled" to expose:
-    #    1. Debugging tools
-    #    2. Extra debugging data in tool responses.
+    # -- Debug mode for the MCP server. "enabled" adds debugging data to tool responses, and is
+    #    needed before a debug tool may be listed in tools. Env var: MCP_DEBUG_MODE
     mcpDebugMode: disabled
     # -- Search backend. microsoft_graph_and_unique_api: dual backend, KB ingestion + semantic search (default).
-    # microsoft_graph: direct Graph search, no ingestion, sync tools not registered.
+    # microsoft_graph: direct Graph search, no ingestion. Listing a sync or debug tool in tools then fails startup.
     mcpBackend: microsoft_graph_and_unique_api
-    # -- Outlook calendar tools and Calendars.ReadWrite.Shared scope. Set to "enabled"
-    #    to register calendar tools and request the extra Graph scope on OAuth / token refresh.
-    #    Also set calendar_integration="enabled" on the Entra Terraform module before
-    #    flipping this flag; otherwise mail token refresh fails with invalid_grant.
-    #    Env var: CALENDAR_INTEGRATION
-    calendarIntegration: disabled
+    # -- Mandatory, non-empty list of the tools to register. Env var: MCP_TOOLS (JSON array).
+    #    A calendar tool needs Calendars.ReadWrite.Shared on the Entra app first.
+    tools: []
+    # -- How the folder cache is refreshed. Env var: DIRECTORY_SYNC_MODE
+    #   scheduled - a cron (directorySyncCronSchedule) and a scan at startup refresh every user's folders
+    #   on_demand - no cron and no startup scan. list_mailboxes_and_directories refreshes the caller's folders on
+    #               every call, and search_emails with a folder filter does when they are over 4 hours old.
+    #               Needs mcpBackend: microsoft_graph and delegatedAccess.scan: disabled.
+    directorySyncMode: scheduled
+    # Mail left out of search_emails, fetch_next_search_pages and open_email for its sensitivity. The agent is told how
+    # many emails were withheld and under which labels. A message whose sensitivity Graph does not return is left out too.
+    # Needs mcpBackend: microsoft_graph, because semantic search results cannot be filtered.
+    excludedSensitivity:
+      # -- Purview sensitivity label ids or names, matched ignoring case. Env var: EXCLUDED_SENSITIVITY_LABELS (JSON array)
+      labels: []
+      # -- Legacy Outlook sensitivity flags: personal, private, confidential.
+      # Env var: EXCLUDED_LEGACY_SENSITIVITY (JSON array)
+      legacy: []
     # -- Optional. Cron schedule for syncing mail folder structure for all active subscriptions.
     # Default: '*/5 * * * *'. Env var: DIRECTORY_SYNC_CRON_SCHEDULE
     # directorySyncCronSchedule: '*/5 * * * *'
@@ -325,7 +336,8 @@ mcpConfig:
   # -- Delegated access configuration. Controls whether the service discovers shared mailbox access.
   delegatedAccess:
     # -- Scanning mode. Values: disabled | full_access_only | granular_access
-    #   disabled         - delegated access scanning is off (default)
+    #   disabled         - delegated access scanning is off (default). Also drops User.Read.All and the .Shared
+    #                      permissions; the draft tools and open_email accept only the user's own mailbox.
     #   full_access_only - discovers Full Access (Read & Manage) delegation via /messages endpoint
     #   granular_access  - discovers folder-level delegation via /mailFolders endpoint + runs verification
     # Env var: DELEGATED_ACCESS_SCAN
@@ -414,6 +426,16 @@ mcpConfig:
     # access at their next Microsoft token refresh.
     # example: ["d050ee55-f842-4802-8263-d802dc017162"]
     allowedTenantIds: []
+    # -- Whether sign-in requests offline_access, so Microsoft returns a refresh token. Env var: MICROSOFT_OFFLINE_ACCESS
+    #   enabled  - the server refreshes Microsoft tokens and runs background jobs with them
+    #   disabled - no refresh token: the MCP session ends when the Microsoft sign-in would. Needs
+    #              app.mcpBackend: microsoft_graph, app.directorySyncMode: on_demand, delegatedAccess.scan: disabled
+    #              and auth.refreshTokenExpiresInSeconds of at most 3600.
+    offlineAccess: enabled
+    # -- Whether sign-in requests the profile and email scopes. openid is always requested.
+    # The profile is read from Microsoft Graph GET /me, so disabling them changes nothing the server stores.
+    # Env var: MICROSOFT_PROFILE_SCOPES
+    profileScopes: enabled
     # -- The public webhook URL reachable from external network for Microsoft Graph subscriptions.
     # Optional - defaults to SELF_URL if not provided.
     # example: https://outlook.mcp.unique.app
@@ -426,6 +448,10 @@ mcpConfig:
 
   # -- Unique API configuration
   unique:
+    # -- Whether the draft tools attach files from the Unique knowledge base (unique://content/...).
+    # Unique is needed, and the settings below are rendered, in microsoft_graph_and_unique_api mode
+    # or when this is enabled. Values: enabled or disabled. Env var: UNIQUE_ATTACHMENTS
+    attachments: enabled
     # -- Authentication mode for Unique API services
     # possible values: cluster_local, external
     # cluster_local: communicates using in-cluster URLs with service headers

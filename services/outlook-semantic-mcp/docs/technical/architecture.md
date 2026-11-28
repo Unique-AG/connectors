@@ -1,7 +1,7 @@
 <!-- confluence-page-id: 2062254116 -->
 <!-- confluence-space-key: PUBDOC -->
 
-The Outlook Semantic MCP Server is a NestJS-based microservice that connects Microsoft Outlook with the Unique platform through the Model Context Protocol (MCP). It syncs emails from connected mailboxes into the Unique knowledge base and exposes MCP tools for AI-assisted email search, draft creation, contact lookup, and — when `CALENDAR_INTEGRATION` is enabled — live Outlook calendar.
+The Outlook Semantic MCP Server is a NestJS-based microservice that connects Microsoft Outlook with the Unique platform through the Model Context Protocol (MCP). It syncs emails from connected mailboxes into the Unique knowledge base and exposes MCP tools for AI-assisted email search, draft creation, contact lookup, and — when a calendar tool is listed in `MCP_TOOLS` — live Outlook calendar.
 
 ## High-Level Architecture
 
@@ -59,7 +59,7 @@ Tools fall into these categories:
 - **Contact lookup** — Searches the user's Microsoft contacts directory via Graph API
 - **Mailbox utilities** — Lists folders and categories via Graph API for search filtering
 - **Connection management** — Checks webhook status, reconnects, or removes the mailbox connection
-- **Calendar** (when `CALENDAR_INTEGRATION` is enabled) — Live Graph query-through for calendars and events; no ingest, webhooks, or calendar tables
+- **Calendar** (when a calendar tool is listed in `MCP_TOOLS`) — Live Graph query-through for calendars and events; no ingest, webhooks, or calendar tables
 
 See [Tools Reference](./tools.md) for the full list and behavior details.
 
@@ -71,7 +71,7 @@ After a user connects, the following pipelines keep the knowledge base in sync w
 
 **Live Catch-Up** — webhook-driven; acknowledged immediately via RabbitMQ, processed async in the consumer; queries Graph for messages since the watermark; watermark defaults to `now()` on inbox creation so notifications are never buffered.
 
-**Directory Sync** — runs on a 5-minute delta query schedule (configurable via `DIRECTORY_SYNC_CRON_SCHEDULE`); keeps local folder tree in sync with Outlook; powers `list_mailboxes_and_directories` and folder-based search filtering; detects email deletion by tracking moves to excluded folders (e.g. Deleted Items).
+**Directory Sync** — runs on a 5-minute delta query schedule (configurable via `DIRECTORY_SYNC_CRON_SCHEDULE`), or with `DIRECTORY_SYNC_MODE=on_demand` only when a tool reads the folders (see [Configuration — DIRECTORY_SYNC_MODE](../operator/configuration.md#DIRECTORY_SYNC_MODE)); keeps local folder tree in sync with Outlook; powers `list_mailboxes_and_directories` and folder-based search filtering; detects email deletion by tracking moves to excluded folders (e.g. Deleted Items).
 
 **Subscription Management** — Graph webhook subscription created automatically on connect; renewed via Microsoft lifecycle notifications (`reauthorizationRequired`). If `subscriptionRemoved`, user calls `reconnect_inbox`; `verify_inbox_connection` reports status (`active`, `expiring_soon`, `expired`, `not_configured`).
 

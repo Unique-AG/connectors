@@ -6,9 +6,14 @@ import {
   HealthIndicatorResult,
   HealthIndicatorService,
 } from '@nestjs/terminus';
-import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
+import {
+  DelegatedAccessConfig,
+  delegatedAccessConfig,
+  type FeaturesConfig,
+  featuresConfig,
+  McpBackendType,
+} from '~/config';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
-import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { AmqpHealthIndicator } from './amqp-health.indicator';
 import { DatabaseHealthIndicator } from './database-health.indicator';
 import { McpProcessesHealthIndicator } from './mcp-processes-health.indicator';
@@ -25,6 +30,7 @@ export class HealthController {
     private readonly amqpIndicator: AmqpHealthIndicator,
     private readonly mcpProcessesIndicator: McpProcessesHealthIndicator,
     @Inject(delegatedAccessConfig.KEY) private delegatedAccessEnvConfig: DelegatedAccessConfig,
+    @Inject(featuresConfig.KEY) private readonly features: FeaturesConfig,
   ) {}
 
   @Get()
@@ -46,7 +52,7 @@ export class HealthController {
       );
     }
 
-    if (isMicrosoftGraphBackend()) {
+    if (this.features.mode === McpBackendType.MicrosoftGraph) {
       return this.healthCheckService.check(checksToRun);
     }
     return this.healthCheckService.check([

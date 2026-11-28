@@ -213,7 +213,7 @@ The Unique Knowledge Base stores the actual ingested email content used for sema
 
 1. Restore or verify the Unique Knowledge Base is operational and reachable from the service. Confirm `UNIQUE_INGESTION_SERVICE_BASE_URL` and `UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL` are correct in the Helm values.
 
-2. Enable debug mode on the deployment if it is not already enabled, by setting `MCP_DEBUG_MODE=enabled` in `mcpConfig.app.mcpDebugMode` and restarting pods. This exposes debug tools including `restart_full_sync`, `run_full_sync`, `pause_full_sync`, and `resume_full_sync`. **Note:** Debug mode exposes these tools to all connected MCP users, not just operators — restrict MCP client access during recovery. See [Configuration](./configuration.md#Application-Configuration).
+2. Enable debug mode on the deployment if it is not already enabled, by setting `MCP_DEBUG_MODE=enabled` in `mcpConfig.app.mcpDebugMode`, adding the debug tools you need to `mcpConfig.app.tools`, and restarting pods. This exposes debug tools including `restart_full_sync`, `run_full_sync`, `pause_full_sync`, and `resume_full_sync`. **Note:** Debug mode exposes these tools to all connected MCP users, not just operators — restrict MCP client access during recovery. See [Configuration](./configuration.md#Application-Configuration).
 
 3. Notify affected users that they must call `restart_full_sync` from their own MCP session. All MCP tools are scoped to the authenticated user — there is currently no admin API or batch endpoint to trigger this on behalf of users. This resets sync state in the local database and re-fetches all emails from Microsoft Graph, re-ingesting them into the restored Knowledge Base. Unlike Scenarios 1 and 2, this is the only recovery scenario where emails must be fully re-ingested — the Knowledge Base no longer contains the files, so the cost includes Microsoft Graph API calls, ingestion API calls, and the full content transfer. Subsequent runs are idempotent — file keys prevent duplicates.
 
@@ -221,7 +221,7 @@ The Unique Knowledge Base stores the actual ingested email content used for sema
 
 5. Live catch-up resumes automatically once ingestion is healthy — emails received during the outage will be processed through the normal webhook pipeline without additional operator action.
 
-6. Once all affected users have called `restart_full_sync`, disable debug mode by removing or unsetting `MCP_DEBUG_MODE` in the Helm values and redeploying (requires a pod restart). Debug mode should not remain enabled in production.
+6. Once all affected users have called `restart_full_sync`, disable debug mode in one deployment: remove the debug tools from `mcpConfig.app.tools` (keep the other tools listed) and set `mcpConfig.app.mcpDebugMode` to `disabled`, then redeploy (requires a pod restart). The server refuses to start with a debug tool listed and debug mode off. Debug mode should not remain enabled in production.
 
 **See also:** [`restart_full_sync`](../technical/tools.md#restart_full_sync), [`sync_progress`](../technical/tools.md#sync_progress), [Configuration](./configuration.md#Application-Configuration)
 

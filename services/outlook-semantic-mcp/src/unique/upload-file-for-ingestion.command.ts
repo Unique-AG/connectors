@@ -44,6 +44,10 @@ export class UploadFileForIngestionCommand {
   // upload flows.
   private correctWriteUrl(writeUrl: string): string {
     const uniqueConfig = this.configService.get('unique', { infer: true });
+    assert.ok(
+      uniqueConfig.enabled,
+      'Ingestion runs only in Unique mode, which needs the Unique config',
+    );
     if (uniqueConfig.serviceAuthMode === 'external') {
       return writeUrl;
     }

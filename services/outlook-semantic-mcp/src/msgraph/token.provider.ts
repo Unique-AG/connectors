@@ -10,7 +10,7 @@ import {
   AuthenticationProviderOptions,
 } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { isObjectType } from 'remeda';
 import { type Dispatcher, fetch, type Response } from 'undici';
 import { z } from 'zod';
@@ -126,7 +126,7 @@ export class TokenProvider implements AuthenticationProvider {
     if (startedMeanwhile) {
       return startedMeanwhile;
     }
-    const refresh = this.refreshOnce(userProfileId).finally(() =>
+    const refresh = this.refreshOnce(userProfileId, rejectedAccessToken).finally(() =>
       inFlightRefreshes.delete(userProfileId),
     );
     inFlightRefreshes.set(userProfileId, refresh);
@@ -137,6 +137,10 @@ export class TokenProvider implements AuthenticationProvider {
     const userProfile = await this.drizzle.query.userProfiles.findFirst({
       where: eq(userProfiles.id, userProfileId),
     });
+    return this.decryptAccessToken(userProfile);
+  }
+
+  private decryptAccessToken(userProfile: UserProfile | undefined): string | undefined {
     if (!userProfile?.accessToken) {
       return undefined;
     }
@@ -147,12 +151,31 @@ export class TokenProvider implements AuthenticationProvider {
     return accessToken;
   }
 
-  private async refreshOnce(userProfileId: string): Promise<string> {
+  private async refreshOnce(userProfileId: string, rejectedAccessToken?: string): Promise<string> {
     const userProfile = await this.drizzle.query.userProfiles.findFirst({
       where: eq(userProfiles.id, userProfileId),
     });
 
-    assert.ok(userProfile?.refreshToken, `No refresh token available for user: ${userProfileId}`);
+    assert.ok(userProfile, `User profile not found: ${userProfileId}`);
+    if (!userProfile.refreshToken) {
+      // Another request already cleared this grant and revoked the session.
+      if (!userProfile.accessToken) {
+        throw new UpstreamCredentialRevokedError(SIGN_IN_EXPIRED_REASON);
+      }
+      // A sign-in that landed after the rejected token was read is kept, not revoked.
+      const storedAccessToken = this.decryptAccessToken(userProfile);
+      assert.ok(storedAccessToken, 'The stored access token was checked above');
+      if (rejectedAccessToken && storedAccessToken !== rejectedAccessToken) {
+        return storedAccessToken;
+      }
+      // Signed in without offline_access: the only way to a new Graph token is a new sign-in.
+      return await this.revokeUpstreamCredential(userProfile, {
+        reason: SIGN_IN_EXPIRED_REASON,
+        failureCode: 'no_refresh_token',
+        logMessage:
+          'Microsoft rejected the access token and no refresh token is stored; cleared the Graph token and revoked the MCP session so the user signs in again',
+      });
+    }
 
     if (userProfile.tokenRefreshRetryAt && userProfile.tokenRefreshRetryAt > new Date()) {
       throw new TokenRefreshCoolingDownError(userProfile.tokenRefreshRetryAt);
@@ -328,7 +351,8 @@ export class TokenProvider implements AuthenticationProvider {
       reason,
       failureCode,
       aadstsCodes,
-    }: { reason?: string; failureCode: string; aadstsCodes?: number[] },
+      logMessage = 'Microsoft grant is permanently invalid; cleared the Graph tokens and revoked the MCP session',
+    }: { reason?: string; failureCode: string; aadstsCodes?: number[]; logMessage?: string },
   ): Promise<never> {
     const cleared = await this.drizzle
       .update(userProfiles)
@@ -357,7 +381,7 @@ export class TokenProvider implements AuthenticationProvider {
       });
     }
     this.logger.warn({
-      msg: 'Microsoft grant is permanently invalid; cleared the Graph tokens and revoked the MCP session',
+      msg: logMessage,
       userProfileId: userProfile.id,
       failureCode,
       aadstsCodes,
@@ -365,6 +389,9 @@ export class TokenProvider implements AuthenticationProvider {
     throw new UpstreamCredentialRevokedError(reason);
   }
 }
+
+const SIGN_IN_EXPIRED_REASON =
+  'the Microsoft sign-in has expired and the server keeps no refresh token';
 
 const MIN_REFRESH_BACKOFF_MS = 60_000;
 const MAX_REFRESH_BACKOFF_MS = 30 * 60_000;
@@ -374,10 +401,16 @@ const inFlightRefreshes = new Map<string, Promise<string>>();
 type UserProfile = typeof userProfiles.$inferSelect;
 
 // Matches the row only while it still holds the refresh token this refresh read.
+// A grant without a refresh token is told apart from a later sign-in by its access token.
 const isSameGrant = (userProfile: UserProfile) =>
   and(
     eq(userProfiles.id, userProfile.id),
-    eq(userProfiles.refreshToken, userProfile.refreshToken ?? ''),
+    userProfile.refreshToken
+      ? eq(userProfiles.refreshToken, userProfile.refreshToken)
+      : and(
+          isNull(userProfiles.refreshToken),
+          eq(userProfiles.accessToken, userProfile.accessToken ?? ''),
+        ),
   );
 
 export class TokenRefreshCoolingDownError extends Error {

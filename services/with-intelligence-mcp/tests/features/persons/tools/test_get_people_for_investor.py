@@ -203,6 +203,10 @@ class TestContactDetails:
         result = await get_people_for_investor(investor_id=2504, client=client)
         assert isinstance(result, PeopleForInvestorResponse)
         assert [person.name for person in result.people] == ["Available", "Restricted"]
+        assert [person.url for person in result.people] == [
+            "https://platform.withintelligence.com/explore/people/1",
+            "https://platform.withintelligence.com/explore/people/2",
+        ]
         assert result.people[1].is_current is None
         assert result.people[1].specialisms is None
 

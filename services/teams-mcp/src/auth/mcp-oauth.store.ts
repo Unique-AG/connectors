@@ -174,6 +174,10 @@ export class McpOAuthStore implements IOAuthStore {
 
   public async upsertUserProfile(user: PassportUser): Promise<string> {
     const { profile, accessToken, refreshToken, provider } = user;
+    assert.ok(
+      refreshToken,
+      'Microsoft returned no refresh token; request the offline_access scope',
+    );
 
     const encryptedAccessToken = this.encryptionService.encryptToString(accessToken);
     const encryptedRefreshToken = this.encryptionService.encryptToString(refreshToken);

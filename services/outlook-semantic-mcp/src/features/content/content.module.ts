@@ -3,6 +3,7 @@ import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { DelegatedAccessUtilsModule } from '../delegated-access/delegated-access-utils.module';
+import { DirectoriesSyncModule } from '../directories-sync/directories-sync.module';
 import { GraphUtilsModule } from '../graph-utils/graph-utils.module';
 import { FullSyncModule } from '../sync/full-sync';
 import { UserUtilsModule } from '../user-utils/user-utils.module';
@@ -13,6 +14,7 @@ import { SearchCursorCleanupSchedulerService } from './search/cursors/search-cur
 import { MsGraphKqlSearchEmailsQuery } from './search/ms-graph-kql-search-emails.query';
 import { SearchEmailsQuery } from './search/search-emails.query';
 import { SemanticSearchEmailsQuery } from './search/semantic-search-emails.query';
+import { SensitivityFilter } from './sensitivity-filter';
 
 const QUERIES = [
   SemanticSearchEmailsQuery,
@@ -32,8 +34,9 @@ const QUERIES = [
     GraphUtilsModule,
     UserUtilsModule,
     DelegatedAccessUtilsModule,
+    DirectoriesSyncModule,
   ],
-  providers: [...QUERIES, SearchCursorCleanupSchedulerService],
+  providers: [...QUERIES, SearchCursorCleanupSchedulerService, SensitivityFilter],
   exports: [...QUERIES],
 })
 export class ContentModule {}

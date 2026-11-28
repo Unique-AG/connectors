@@ -93,6 +93,7 @@ class TestResolvingByName:
         result = await get_investor(name="Virginia Retirement System", client=client)
         assert isinstance(result, InvestorProfileResponse)
         assert result.id == 2504
+        assert result.url == "https://platform.withintelligence.com/explore/investors/2504"
         assert result.investor_type == "Public Pension"
 
     @respx.mock

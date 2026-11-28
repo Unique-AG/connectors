@@ -1,5 +1,21 @@
 import { vi } from 'vitest';
 
+// Required at startup. Code that reads the features when its file loads needs them before any import.
+process.env.MCP_BACKEND ??= 'microsoft_graph_and_unique_api';
+process.env.DELEGATED_ACCESS_SCAN ??= 'full_access_only';
+process.env.MCP_TOOLS ??= JSON.stringify([
+  'list_mailboxes_and_directories',
+  'list_categories',
+  'draft_email',
+  'update_draft_email',
+  'add_attachments_to_draft_email',
+  'remove_attachments_from_draft_email',
+  'lookup_contacts',
+  'search_emails',
+  'fetch_next_search_pages',
+  'open_email',
+]);
+
 vi.mock('@nestjs/common', async () => {
   const actual = await vi.importActual('@nestjs/common');
   return {

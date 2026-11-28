@@ -4,9 +4,11 @@ from pydantic import Field
 
 from with_intelligence_mcp.features.persons.api_responses import (
     PersonExtendedAttributes,
+    PersonListItemAttributes,
     PersonRoleAttributes,
 )
 from with_intelligence_mcp.models import OmitNoneModel
+from with_intelligence_mcp.utils import APP_LINK_DESCRIPTION, explore_url
 
 
 class PersonResponse(OmitNoneModel):
@@ -16,6 +18,7 @@ class PersonResponse(OmitNoneModel):
     name: str | None = Field(
         default=None, description="Person's full name.", examples=["Jordan Smith"]
     )
+    url: str = Field(description=APP_LINK_DESCRIPTION)
     job_title: str | None = Field(
         default=None,
         description="Person's title at this investor.",
@@ -70,6 +73,7 @@ class PersonResponse(OmitNoneModel):
         return cls(
             id=attributes.id,
             name=attributes.full_name or attributes.name,
+            url=explore_url("people", attributes.id),
             job_title=role.job_title if role else None,
             seniority=role.seniority.name if role and role.seniority else None,
             specialisms=(
@@ -84,6 +88,10 @@ class PersonResponse(OmitNoneModel):
             role_started=role.start_date if role else None,
             role_ended=role.end_date if role else None,
         )
+
+    @classmethod
+    def from_listing(cls, attributes: PersonListItemAttributes) -> Self:
+        return cls(id=attributes.id, name=attributes.name, url=explore_url("people", attributes.id))
 
 
 class PeopleForInvestorResponse(OmitNoneModel):

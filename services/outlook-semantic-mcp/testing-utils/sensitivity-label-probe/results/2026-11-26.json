@@ -1,0 +1,92 @@
+{
+  "probedAt": "2026-11-26",
+  "how": "Graph Explorer, signed in as a test-tenant user, Microsoft Graph v1.0. Requests as listed in ../README.md.",
+  "properties": {
+    "purview": "String {00020386-0000-0000-C000-000000000046} Name msip_labels",
+    "legacy": "Integer 0x0036 (PidTagSensitivity): 0 normal, 1 personal, 2 private, 3 confidential"
+  },
+  "messages": [
+    {
+      "role": "received, Purview label 'Confidential Encrypted'",
+      "folder": "Inbox",
+      "legacy": "0",
+      "purview": {
+        "labelId": "4f1c2a7e-9b3d-4e85-a6c0-d2b71e93f5a8",
+        "name": "Confidential Encrypted",
+        "method": "Privileged",
+        "contentBits": "9"
+      },
+      "internetMessageHeaders": "returned; msip_labels header present"
+    },
+    {
+      "role": "received, legacy personal/private/confidential",
+      "folder": "Inbox",
+      "legacy": "1 / 2 / 3",
+      "purview": "property present, empty string",
+      "internetMessageHeaders": "returned; Sensitivity header (company-confidential for 3)"
+    },
+    {
+      "role": "sent, Purview label 'Confidential Encrypted' plus legacy 1 / 2 / 3",
+      "folder": "Sent Items",
+      "legacy": "1 / 2 / 3",
+      "purview": {
+        "labelId": "4f1c2a7e-9b3d-4e85-a6c0-d2b71e93f5a8",
+        "name": "Confidential Encrypted",
+        "method": "Standard",
+        "contentBits": "1"
+      },
+      "internetMessageHeaders": "not returned"
+    },
+    {
+      "role": "sent, legacy personal/private/confidential only",
+      "folder": "Sent Items",
+      "legacy": "1 / 2 / 3",
+      "purview": "property present, empty string",
+      "internetMessageHeaders": "not returned"
+    },
+    {
+      "role": "unlabelled mail (received, sent, drafts)",
+      "legacy": "0",
+      "purview": "property absent, or empty string",
+      "internetMessageHeaders": "returned for received mail only"
+    }
+  ],
+  "requests": {
+    "searchWithoutInternetMessageHeaders": {
+      "url": "/users/{id}/messages?$search=...&$select=<search_emails' select>&$expand=...  and  /users/{id}/mailFolders/{folder}/messages?$search=...",
+      "status": 200,
+      "result": "the $expand filter is ignored: returns 'Binary 0xf03' and the normalized subject instead of the requested properties. Mailbox-wide and folder-scoped alike, with or without ConsistencyLevel: eventual."
+    },
+    "searchWithInternetMessageHeadersSelected": {
+      "url": "same, with internetMessageHeaders added to $select",
+      "status": 200,
+      "result": "both properties returned in full (Purview 436/441 characters), mailbox-wide and folder-scoped, Inbox and Sent Items, alone or inside a $batch"
+    },
+    "searchNextLink": {
+      "result": "the @odata.nextLink keeps $select and $expand; page 2 returns both properties in full"
+    },
+    "getOneMessage": {
+      "url": "/users/{id}/messages/{messageId}?$expand=... (any $select, or none)",
+      "status": 200,
+      "result": "both properties in full"
+    },
+    "listFolderWithExpand": {
+      "status": 200,
+      "result": "without internetMessageHeaders in $select the Purview value is cut to its first 255 characters (label id kept, _Name lost); with it, full"
+    },
+    "filterLegacyCast": {
+      "url": "$filter=singleValueExtendedProperties/any(ep: ep/id eq 'Integer 0x0036' and cast(ep/value, Edm.Int32) ne 0)",
+      "status": 200,
+      "result": "works on a listing"
+    },
+    "searchPlusFilter": {
+      "status": 400,
+      "error": "SearchWithFilter: The query parameter '$filter' is not supported with '$search'."
+    }
+  },
+  "notProbed": [
+    "a saved draft carrying a Purview label (none in the mailbox); sent items are former drafts and carry it",
+    "$filter on the msip_labels value",
+    "why selecting internetMessageHeaders changes what $search returns; it is not documented"
+  ]
+}

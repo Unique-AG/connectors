@@ -1,0 +1,89 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/helm-unittest/helm-unittest/main/schema/helm-testsuite.json
+suite: Unique config env injection
+templates:
+  - all.yaml
+values:
+  - ../ci-values.yaml
+set:
+  mcpConfig:
+    enabled: true
+    app:
+      selfUrl: https://outlook-mcp.example.com
+      tools:
+        - search_emails
+    microsoft:
+      clientId: test-client-id
+tests:
+  - it: renders Unique attachments and the Unique connection by default
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: UNIQUE_ATTACHMENTS
+            value: enabled
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: UNIQUE_SERVICE_AUTH_MODE
+            value: cluster_local
+
+  - it: renders no Unique connection in microsoft_graph mode with Unique attachments off
+    set:
+      mcpConfig:
+        app:
+          mcpBackend: microsoft_graph
+        unique:
+          attachments: disabled
+          serviceAuthMode: external
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: UNIQUE_ATTACHMENTS
+            value: disabled
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: UNIQUE_SERVICE_AUTH_MODE
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: UNIQUE_INGESTION_SERVICE_BASE_URL
+          any: true
+
+  - it: renders the Unique connection in Unique mode with Unique attachments off
+    set:
+      mcpConfig:
+        unique:
+          attachments: disabled
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: UNIQUE_SERVICE_AUTH_MODE
+            value: cluster_local
+
+  - it: renders the Unique connection in microsoft_graph mode while Unique attachments are on
+    set:
+      mcpConfig:
+        app:
+          mcpBackend: microsoft_graph
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: UNIQUE_SERVICE_AUTH_MODE
+            value: cluster_local

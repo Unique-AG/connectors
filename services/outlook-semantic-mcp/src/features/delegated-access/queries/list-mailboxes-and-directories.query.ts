@@ -4,6 +4,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNullish, unique } from 'remeda';
+import { type FeaturesConfig, featuresConfig } from '~/config';
 import {
   type DirectoryType,
   DRIZZLE,
@@ -43,7 +44,10 @@ export interface UserMailbox {
 export class ListMailboxesAndDirectoriesQuery {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(@Inject(DRIZZLE) private readonly db: DrizzleDatabase) {}
+  public constructor(
+    @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
+    @Inject(featuresConfig.KEY) private readonly features: FeaturesConfig,
+  ) {}
 
   @Span()
   public async run(userProfileId: string): Promise<UserMailbox[]> {
@@ -80,6 +84,11 @@ export class ListMailboxesAndDirectoriesQuery {
       isOwn: true,
       folders: ownTree,
     };
+
+    // Rows left from an earlier scan are not reachable without the `.Shared` permissions.
+    if (!this.features.sharedMailboxes) {
+      return [ownMailbox];
+    }
 
     const mailbosesWithSharedFolders = await this.getMailboxesWithSharedFolders(userProfileId);
     const mailboxesWithFullAccess = await this.getMailboxesWithFullAccess(userProfileId);

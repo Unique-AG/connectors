@@ -36,6 +36,7 @@ import {
   databaseConfig,
   type EncryptionConfig,
   encryptionConfig,
+  featuresConfig,
   type MicrosoftConfig,
   type MicrosoftConfigNamespaced,
   microsoftConfig,
@@ -67,6 +68,7 @@ import { deploymentSecrets } from './utils/log-secrets';
         authConfig,
         databaseConfig,
         encryptionConfig,
+        featuresConfig,
         microsoftConfig,
         rateLimitConfig,
         uniqueConfig,
@@ -77,9 +79,10 @@ import { deploymentSecrets } from './utils/log-secrets';
     }),
     ProxyModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService<UniqueConfigNamespaced, true>) => ({
-        isExternal: config.get('unique', { infer: true }).serviceAuthMode === 'external',
-      }),
+      useFactory: (config: ConfigService<UniqueConfigNamespaced, true>) => {
+        const unique = config.get('unique', { infer: true });
+        return { isExternal: unique.enabled && unique.serviceAuthMode === 'external' };
+      },
     }),
     ScheduleModule.forRoot(),
     LoggerModule.forRootAsync({
@@ -203,6 +206,7 @@ import { deploymentSecrets } from './utils/log-secrets';
         refreshTokenExpiresIn: configService.get('auth.refreshTokenExpiresInSeconds', {
           infer: true,
         }),
+        refreshTokenExpiry: configService.get('auth.refreshTokenExpiry', { infer: true }),
         disableRateLimiting: configService.get('auth.disableRateLimiting', { infer: true }),
 
         oauthStore: new McpOAuthStore(

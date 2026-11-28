@@ -24,6 +24,7 @@ describe('OAuthStrategyService', () => {
       authCodeExpiresIn: 600,
       accessTokenExpiresIn: 3600,
       refreshTokenExpiresIn: 86400,
+      refreshTokenExpiry: 'sliding',
       oauthSessionExpiresIn: 600000,
       serverUrl: 'http://localhost:3000',
       resource: 'http://localhost:3000/mcp',
@@ -110,6 +111,19 @@ describe('OAuthStrategyService', () => {
         refreshToken: 'refresh-token',
         provider: 'TestProvider',
       });
+    });
+
+    it('signs the user in without a refresh token when the provider issued none', () => {
+      service.onModuleInit();
+
+      const strategyCallback = mockStrategy.mock.calls[0][1];
+      const done = vi.fn();
+      strategyCallback('access-token', undefined, { id: 'user-123' }, done);
+
+      expect(done).toHaveBeenCalledWith(
+        null,
+        expect.objectContaining({ accessToken: 'access-token', refreshToken: undefined }),
+      );
     });
 
     it('handles profile mapping errors gracefully', () => {

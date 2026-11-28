@@ -27,10 +27,11 @@ Where a feature works the same in both modes, this page says so once. Where beha
 - `search_emails` queries Microsoft Graph directly using KQL keyword search only. No knowledge base interaction occurs.
 - Folder filtering is supported via the `directories` field on each `msGraphKeywordSearchQueries` entry. Pass a well-known folder name (e.g. `Inbox`) or a folder ID from `list_mailboxes_and_directories`. This works for the user's own mailbox and for fully delegated mailboxes (Full Access).
 - Search is **not supported** for mailboxes where the user only has folder-level (partial) access — Microsoft Graph requires full mailbox access for `$search` queries. See [Known limitations](#Known-Limitations) below.
+- Mail with a configured Purview sensitivity label or legacy Outlook sensitivity flag can be left out of search and `open_email`. See [Configuration — Sensitivity exclusions](../operator/configuration.md#Sensitivity-exclusions).
 
 **What's not supported (both modes)**
 
-- Task or file data — only mail is in scope here. Calendar is a separate, flag-gated live Graph path; see [Calendar](#Calendar).
+- Task or file data — only mail is in scope here. Calendar is a separate live Graph path, turned on by listing a calendar tool in `MCP_TOOLS`; see [Calendar](#Calendar).
 
 **See also:** [Tools — search_emails](./tools.md#search_emails)
 
@@ -64,7 +65,7 @@ Available in both modes. Behaviour is identical.
 - Edit an existing unsent draft — subject, body, To and CC recipients — via `update_draft_email`. This works for drafts created by the MCP and for drafts the user wrote in Outlook.
 - Add attachments to an existing draft via `add_attachments_to_draft_email`.
 - Remove attachments from an existing draft via `remove_attachments_from_draft_email`. The user must confirm the removal in a prompt first.
-- Find drafts with `search_emails` (results carry `isDraft`) and read the live HTML with `open_email` (`openEmailParams`) before editing. Edits in a shared or delegated mailbox use `openEmailParams.mailbox`.
+- Find drafts with `search_emails` (results carry `isDraft`) and read the live HTML with `open_email` (`openEmailParams`) before editing. Edits in a shared or delegated mailbox use `openEmailParams.mailbox`, which needs [`DELEGATED_ACCESS_SCAN`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) set to anything but `disabled`.
 
 **What's not supported**
 
@@ -241,7 +242,7 @@ Configure scanning via [`DELEGATED_ACCESS_SCAN`](../operator/configuration.md#DE
 
 ## Calendar
 
-**Both modes**, only when [`CALENDAR_INTEGRATION`](../operator/configuration.md#CALENDAR_INTEGRATION) is `enabled`.
+**Both modes**, only when a calendar tool is listed in [`MCP_TOOLS`](../operator/configuration.md#MCP_TOOLS). Only the listed calendar tools are registered.
 
 Live query-through to Microsoft Graph. No calendar ingest, webhooks, or calendar tables. The tools are `list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event`, and `cancel_event`.
 
@@ -261,9 +262,9 @@ Live query-through to Microsoft Graph. No calendar ingest, webhooks, or calendar
 
 **Setup**
 
-Enablement is operator-side: Entra admin consent for `Calendars.ReadWrite.Shared` first, then `CALENDAR_INTEGRATION=enabled`. Existing users must reconnect Outlook after the flag is turned on (unless tenant admin consent already covers that scope). `reconnect_inbox` only renews the mail webhook — it does not re-run OAuth. If a tool returns `consentRequired: true`, the user must reconnect Outlook; do not send them to `/auth/authorize`.
+Enablement is operator-side: register `Calendars.ReadWrite.Shared` on the Entra app first, then list the calendar tools in `MCP_TOOLS`. Existing users must reconnect Outlook after the first calendar tool is listed (unless tenant admin consent already covers that scope). `reconnect_inbox` only renews the mail webhook — it does not re-run OAuth. If a tool returns `consentRequired: true`, the user must reconnect Outlook; do not send them to `/auth/authorize`.
 
-**See also:** [Tools — Calendar](./tools.md#Calendar) — [Configuration — CALENDAR_INTEGRATION](../operator/configuration.md#CALENDAR_INTEGRATION)
+**See also:** [Tools — Calendar](./tools.md#Calendar) — [Configuration — Calendar tools](../operator/configuration.md#Calendar-tools)
 
 ---
 

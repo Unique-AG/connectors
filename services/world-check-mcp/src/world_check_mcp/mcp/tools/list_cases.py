@@ -32,6 +32,7 @@ async def list_cases(
     group_id: GroupId,
     limit: PageSize = 25,
     page_reference: PageReference = None,
+    *,
     upstream: Upstream = Depends(get_upstream),
 ) -> contexts.CasePage:
     return await contexts.search_cases(

@@ -1,12 +1,8 @@
-import { type DynamicModule, Module } from '@nestjs/common';
+import { type DynamicModule, Module, type Type } from '@nestjs/common';
+import { type FeaturesConfig, loadFeaturesConfig, type ToolName, toolsInGroup } from '~/config';
 import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
-import {
-  isCalendarEnabled,
-  isDebugMode,
-  isMicrosoftGraphBackend,
-} from '~/utils/backend-config.utils';
 import { AdminModule } from './admin/admin.module';
 import { AdminOpsTool } from './admin/admin-ops.tool';
 import { CalendarModule } from './calendar/calendar.module';
@@ -53,60 +49,48 @@ import { LiveCatchUpModule } from './sync/live-catch-up/live-catch-up.module';
 import { SyncRecoveryModule } from './sync/sync-recovery.module';
 import { UserUtilsModule } from './user-utils/user-utils.module';
 
+export const TOOL_CLASSES: Record<ToolName, Type> = {
+  list_mailboxes_and_directories: ListMailboxesAndDirectoriesTool,
+  list_categories: ListCategoriesTool,
+  draft_email: CreateDraftEmailTool,
+  update_draft_email: UpdateDraftEmailTool,
+  add_attachments_to_draft_email: AddAttachmentsToDraftEmailTool,
+  remove_attachments_from_draft_email: RemoveAttachmentsFromDraftEmailTool,
+  lookup_contacts: LookupContactsTool,
+  search_emails: SearchEmailsTool,
+  fetch_next_search_pages: FetchNextSearchPagesTool,
+  open_email: OpenEmailTool,
+  sync_progress: SyncProgressTool,
+  verify_inbox_connection: VerifyInboxConnectionTool,
+  delete_inbox_data: DeleteInboxDataTool,
+  reconnect_inbox: ReconnectInboxTool,
+  run_full_sync: RunFullSyncTool,
+  restart_full_sync: RestartFullSyncTool,
+  pause_full_sync: PauseFullSyncTool,
+  resume_full_sync: ResumeFullSyncTool,
+  admin_ops: AdminOpsTool,
+  list_calendars: ListCalendarsTool,
+  search_calendar_events: SearchCalendarEventsTool,
+  check_availability: CheckAvailabilityTool,
+  suggest_meeting_times: SuggestMeetingTimesTool,
+  respond_to_invite: RespondToInviteTool,
+  create_event: CreateEventTool,
+  update_event: UpdateEventTool,
+  cancel_event: CancelEventTool,
+};
+
 /**
  * Every calendar tool, exported so the schema-harmony test runs over the real registration list
  * rather than a copy that can silently fall behind.
  */
-export const CALENDAR_TOOLS = [
-  ListCalendarsTool,
-  SearchCalendarEventsTool,
-  CheckAvailabilityTool,
-  SuggestMeetingTimesTool,
-  RespondToInviteTool,
-  CreateEventTool,
-  UpdateEventTool,
-  CancelEventTool,
-] as const;
+export const CALENDAR_TOOLS = toolsInGroup('calendar').map((name) => TOOL_CLASSES[name]);
 
 @Module({})
 export class BackendModule {}
 
-export function registerBackendModule(): DynamicModule {
-  const isGraph = isMicrosoftGraphBackend();
-  const isDebug = isDebugMode();
-  const isCalendar = isCalendarEnabled();
-
-  const uniqueAndMicrosoftBackendCommonTools = [
-    ListMailboxesAndDirectoriesTool,
-    ListCategoriesTool,
-    CreateDraftEmailTool,
-    UpdateDraftEmailTool,
-    AddAttachmentsToDraftEmailTool,
-    RemoveAttachmentsFromDraftEmailTool,
-    LookupContactsTool,
-    SearchEmailsTool,
-    FetchNextSearchPagesTool,
-    OpenEmailTool,
-  ];
-
-  const uniqueOnlyTools = isGraph
-    ? []
-    : [
-        SyncProgressTool,
-        VerifyInboxConnectionTool,
-        DeleteInboxDataTool,
-        ReconnectInboxTool,
-        ...(!isDebug
-          ? []
-          : [
-              RunFullSyncTool,
-              RestartFullSyncTool,
-              PauseFullSyncTool,
-              ResumeFullSyncTool,
-              AdminOpsTool,
-            ]),
-      ];
-
+export function registerBackendModule(
+  features: FeaturesConfig = loadFeaturesConfig(),
+): DynamicModule {
   return {
     module: BackendModule,
     imports: [
@@ -130,12 +114,10 @@ export function registerBackendModule(): DynamicModule {
       DelegatedAccessModule,
       PostAuthorizationUserFlowModule,
       DelegatedAccessUtilsModule,
-      ...(isCalendar ? [CalendarModule] : []),
+      ...(features.calendar ? [CalendarModule] : []),
     ],
     providers: [
-      ...uniqueAndMicrosoftBackendCommonTools,
-      ...uniqueOnlyTools,
-      ...(isCalendar ? CALENDAR_TOOLS : []),
+      ...[...features.tools].map((name) => TOOL_CLASSES[name]),
       MailSubscriptionController,
     ],
     controllers: [MailSubscriptionController],

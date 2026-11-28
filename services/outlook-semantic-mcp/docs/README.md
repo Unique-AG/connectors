@@ -9,7 +9,7 @@
 
 ## Overview
 
-The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server syncs emails within an operator-configured time frame (with additional content and sender filters) and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and list folders through 13 mail MCP tools (plus 4 additional debug-mode tools), and query Outlook calendar through 8 more tools when `CALENDAR_INTEGRATION` is enabled.
+The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server syncs emails within an operator-configured time frame (with additional content and sender filters) and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and list folders through 10 mail MCP tools (plus 4 sync tools and 5 debug-mode tools in `microsoft_graph_and_unique_api` mode), and query Outlook calendar through 8 calendar tools. `MCP_TOOLS` selects which of these tools the server registers.
 
 **Note:** This service is both an MCP server and a connector. It exposes tools for AI clients to invoke on demand, and once a user connects their account, it automatically syncs their emails (within an operator-configured time frame and [filters](./operator/configuration.md)) into the Unique knowledge base in the background.
 
@@ -17,7 +17,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ## Quick Summary
 
-**What it does:** Provides AI clients with 13 mail MCP tools (plus 4 debug-mode tools) for searching emails, composing drafts, looking up contacts, listing folders, and monitoring sync status, plus 8 calendar tools when `CALENDAR_INTEGRATION` is enabled
+**What it does:** Provides AI clients with 10 mail MCP tools for searching emails, composing drafts, looking up contacts and listing folders, 4 sync tools for monitoring sync status (`microsoft_graph_and_unique_api` mode only), 5 debug-mode tools, and 8 calendar tools. `MCP_TOOLS` selects which tools are registered
 
 **Deployment:** Kubernetes-based NestJS microservice
 
@@ -42,7 +42,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ### Permissions
 
-All permissions are delegated. Mail permissions require no admin consent. This includes `Mail.ReadWrite.Shared`, which is always requested at OAuth time (even when `DELEGATED_ACCESS_SCAN=disabled`) and enables delegated mailbox access when configured. `Calendars.ReadWrite.Shared` is requested only when `CALENDAR_INTEGRATION=enabled` and typically does require admin consent. See [Permissions](./technical/permissions.md) for the full list and least-privilege justifications.
+All permissions are delegated. The server requests only what its configuration needs: `MCP_TOOLS` and `DELEGATED_ACCESS_SCAN` decide the list (see [Configuration — Requested Graph permissions](./operator/configuration.md#Requested-Graph-permissions)). Only `User.Read.All` requires admin consent: it is requested with shared mailboxes on. `Mail.ReadWrite` is requested only when a draft tool is listed, and the `.Shared` mail permissions only when `DELEGATED_ACCESS_SCAN` is not `disabled`. `Calendars.ReadWrite.Shared` is requested only when a calendar tool is listed in `MCP_TOOLS` and is user-consentable like the mail permissions. See [Permissions](./technical/permissions.md) for the full list and least-privilege justifications.
 
 ## Features
 
@@ -56,7 +56,7 @@ All permissions are delegated. Mail permissions require no admin consent. This i
 
 **Draft Creation**
 
-- Create fresh draft emails (subject, body, recipients, attachments) in the signed-in user's personal mailbox or in a shared mailbox via `draft_email`
+- Create fresh draft emails (subject, body, recipients, attachments) in the signed-in user's personal mailbox or, when `DELEGATED_ACCESS_SCAN` is not `disabled`, in a shared mailbox via `draft_email`
 - Create reply-all drafts for existing emails in personal or shared mailboxes — Graph pre-fills all original recipients automatically
 - Drafts are written directly to the Outlook Drafts folder via Microsoft Graph and are not sent automatically
 - Edit an existing draft (including one the user wrote in Outlook) — subject, body, recipients — via `update_draft_email`, and add or remove its attachments via `add_attachments_to_draft_email` and `remove_attachments_from_draft_email` (removal asks the user to confirm)
@@ -73,7 +73,7 @@ All permissions are delegated. Mail permissions require no admin consent. This i
 
 **Calendar (Optional)**
 
-- When `CALENDAR_INTEGRATION` is enabled, AI clients can list calendars, search events, check free/busy, suggest meeting times, respond to invitations, and create, update, or cancel events
+- When a calendar tool is listed in `MCP_TOOLS`, AI clients can list calendars, search events, check free/busy, suggest meeting times, respond to invitations, and create, update, or cancel events
 - Live Microsoft Graph query-through — no calendar ingest. `respond_to_invite` notifies immediately; create, update, and cancel wait for in-chat confirmation
 - See [Features — Calendar](./technical/features.md#Calendar) and [Tools — Calendar](./technical/tools.md#Calendar)
 
@@ -227,7 +227,7 @@ Existing drafts are edited with `update_draft_email`, `add_attachments_to_draft_
    - Compose drafts with `draft_email` and edit them with `update_draft_email`
    - Look up contacts with `lookup_contacts`
    - Use `list_mailboxes_and_directories` and `list_categories` to obtain folder IDs and category names for filtering searches
-   - When calendar is enabled: list calendars, search events, check availability, and create or update meetings
+   - When a calendar tool is listed in `MCP_TOOLS`: list calendars, search events, check availability, and create or update meetings
 
 ## Limitations and Constraints
 
@@ -267,7 +267,7 @@ See [Architecture — Authentication](./technical/architecture.md#Authentication
 ### Not Supported
 
 - **Application permissions**: The server uses delegated permissions only (acting on behalf of a signed-in user). It does not support application-level permissions, so it cannot run as a background daemon accessing mailboxes without user sign-in
-- **Task data**: Tasks are not in scope. Calendar is optional and flag-gated — see [Features — Calendar](./technical/features.md#Calendar)
+- **Task data**: Tasks are not in scope. Calendar is optional and turned on by listing a calendar tool in `MCP_TOOLS` — see [Features — Calendar](./technical/features.md#Calendar)
 - **Token introspection**: MCP tokens validated locally with short TTLs for performance
 
 ## Related Documentation

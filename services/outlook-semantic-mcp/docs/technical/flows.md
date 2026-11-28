@@ -180,7 +180,7 @@ The server continuously syncs the user's Outlook folder structure from Microsoft
 
 **Key points:**
 
-- Directory sync runs on a 5-minute schedule (configurable via `DIRECTORY_SYNC_CRON_SCHEDULE`) using Graph delta queries, plus on-demand at the start of each full sync and live catch-up execution.
+- Directory sync runs on a 5-minute schedule (configurable via `DIRECTORY_SYNC_CRON_SCHEDULE`) using Graph delta queries, plus on-demand at the start of each full sync and live catch-up execution. With `DIRECTORY_SYNC_MODE=on_demand` there is no schedule: `list_mailboxes_and_directories` syncs the caller's folders on every call, and `search_emails` with a folder filter syncs them first when they are over 4 hours old.
 - System folders such as Deleted Items, Junk Email, Recoverable Items Deletions, and Conversation History are excluded from sync (`ignoreForSync = true`). When an email is moved to an excluded folder, it is removed from the knowledge base.
 - The `list_mailboxes_and_directories` tool returns the folder tree synced here. The folder IDs it returns can be passed in the `conditions[].directories` field of `search_emails` to narrow results to a specific mailbox folder.
 
