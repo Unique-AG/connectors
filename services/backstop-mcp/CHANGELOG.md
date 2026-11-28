@@ -1,5 +1,51 @@
 # Changelog
 
+## [4.0.0](https://github.com/Unique-AG/connectors/compare/backstop-mcp@3.1.0...backstop-mcp@4.0.0) (2026-11-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* **mcp-credential-auth,backstop-mcp,with-intelligence-mcp:** accept only known redirect hosts and show where the login is sent ([#1338](https://github.com/Unique-AG/connectors/issues/1338))
+
+### Bug Fixes
+
+* **backstop-mcp:** cite Backstop records by name with their CRM page (UN-30123, UN-30570) ([#1776](https://github.com/Unique-AG/connectors/issues/1776)) ([0027bff](https://github.com/Unique-AG/connectors/commit/0027bfffe816bdf0f1dfc4c0748a7e2e0d6ca08d))
+* **mcp-credential-auth,backstop-mcp,with-intelligence-mcp:** accept only known redirect hosts and show where the login is sent ([#1338](https://github.com/Unique-AG/connectors/issues/1338)) ([c2ccdec](https://github.com/Unique-AG/connectors/commit/c2ccdec7ef2f238ec6d533101321ed2fe2e92b69))
+
+
+### Dependencies
+
+* **deps:** bump authlib from 1.9.5 to 1.9.6 ([#1748](https://github.com/Unique-AG/connectors/issues/1748)) ([8c32dc1](https://github.com/Unique-AG/connectors/commit/8c32dc11ed0da23f0249d5698d8f3ff3e9da2afa))
+* **deps:** bump authlib from 1.9.6 to 1.9.8 ([#1794](https://github.com/Unique-AG/connectors/issues/1794)) ([a737049](https://github.com/Unique-AG/connectors/commit/a737049e13c4ee3c25efbb95b9df7dcfd2284bd0))
+* **deps:** bump authlib from 1.9.8 to 1.9.9 ([#1813](https://github.com/Unique-AG/connectors/issues/1813)) ([c636a65](https://github.com/Unique-AG/connectors/commit/c636a6566c10edf37b3400988aedb43c13c92e4e))
+* **deps:** bump authlib from 1.9.9 to 1.9.10 ([#1862](https://github.com/Unique-AG/connectors/issues/1862)) ([ea4325a](https://github.com/Unique-AG/connectors/commit/ea4325aea22e772767b2f89ed0d72a5cca62a8ba))
+* **deps:** bump certifi from 2026.10.23 to 2026.11.20 ([#1856](https://github.com/Unique-AG/connectors/issues/1856)) ([60055c9](https://github.com/Unique-AG/connectors/commit/60055c929bca28cda5f34b0226b6fb27133f41a8))
+* **deps:** bump cyclopts from 5.3.3 to 5.4.2 ([#1698](https://github.com/Unique-AG/connectors/issues/1698)) ([fc38cc2](https://github.com/Unique-AG/connectors/commit/fc38cc21ded9e058430d43ef2bd833dd4259be17))
+* **deps:** bump cyclopts from 5.4.2 to 5.5.0 ([#1749](https://github.com/Unique-AG/connectors/issues/1749)) ([537e27b](https://github.com/Unique-AG/connectors/commit/537e27be4b64c3c51a281a9f8bbab455529dd1e0))
+* **deps:** bump cyclopts from 5.5.0 to 5.5.2 ([#1780](https://github.com/Unique-AG/connectors/issues/1780)) ([cac9f6f](https://github.com/Unique-AG/connectors/commit/cac9f6f1c2e94970c861c1fd128e8f0754769cb4))
+* **deps:** bump email-validator from 2.3.0 to 2.4.0 ([#1750](https://github.com/Unique-AG/connectors/issues/1750)) ([79df80f](https://github.com/Unique-AG/connectors/commit/79df80f6ed1ba3d9a7e52c7cae5efc0f7c0e32b6))
+* **deps:** bump exceptiongroup from 1.3.1 to 1.3.2 ([#1846](https://github.com/Unique-AG/connectors/issues/1846)) ([970d246](https://github.com/Unique-AG/connectors/commit/970d246a26f26d76124591cb6ce89f00cfdd51f2))
+* **deps:** bump httpx2 from 2.16.0 to 2.16.2 ([#1785](https://github.com/Unique-AG/connectors/issues/1785)) ([9613d9a](https://github.com/Unique-AG/connectors/commit/9613d9a5b39d60fcd92c0b6ad1f87a53e489c136))
+* **deps:** bump markdown-it-py from 4.2.0 to 4.3.0 ([#1668](https://github.com/Unique-AG/connectors/issues/1668)) ([de3ce06](https://github.com/Unique-AG/connectors/commit/de3ce068a0c8fb84db5f555da324b8ee2f8cc315))
+* **deps:** bump markdownify from 1.2.3 to 1.2.4 ([#1824](https://github.com/Unique-AG/connectors/issues/1824)) ([20e4071](https://github.com/Unique-AG/connectors/commit/20e40719518910b6bed6597d451cabfec6a6db03))
+* **deps:** bump platformdirs from 4.14.5 to 4.14.7 ([#1816](https://github.com/Unique-AG/connectors/issues/1816)) ([cee2479](https://github.com/Unique-AG/connectors/commit/cee247999c44f0ffc1a43a113a3b29560b02d1f5))
+* **deps:** bump platformdirs from 4.14.7 to 4.14.8 ([#1863](https://github.com/Unique-AG/connectors/issues/1863)) ([78ee019](https://github.com/Unique-AG/connectors/commit/78ee0194e356ee61525506a55305f863a3050e85))
+* **deps:** bump pydantic packages ([#1842](https://github.com/Unique-AG/connectors/issues/1842)) ([a9659e6](https://github.com/Unique-AG/connectors/commit/a9659e6843c18fb2c353f0fa352949b9abf32ade))
+* **deps:** bump pydantic-settings from 2.16.2 to 2.16.3 ([#1720](https://github.com/Unique-AG/connectors/issues/1720)) ([1d248c1](https://github.com/Unique-AG/connectors/commit/1d248c177601907f67d3bb0af5721cf4fe5e0da5))
+* **deps:** bump pytest-asyncio from 1.4.1.post1 to 1.5.0 ([#1701](https://github.com/Unique-AG/connectors/issues/1701)) ([aaf83d7](https://github.com/Unique-AG/connectors/commit/aaf83d711cb601fb1e93f9c6507bc2af2c4a13b0))
+* **deps:** bump python-multipart from 0.0.33 to 0.0.34 ([#1795](https://github.com/Unique-AG/connectors/issues/1795)) ([e9308f1](https://github.com/Unique-AG/connectors/commit/e9308f15747922a00562d05a9bae9b0c084af7cc))
+* **deps:** bump pyyaml from 6.0.3 to 6.0.4 ([#1857](https://github.com/Unique-AG/connectors/issues/1857)) ([75520d0](https://github.com/Unique-AG/connectors/commit/75520d05afea62069dddb286aff9a1a75b89fa34))
+* **deps:** bump ruff from 0.17.4 to 0.17.5 ([#1702](https://github.com/Unique-AG/connectors/issues/1702)) ([ead00ca](https://github.com/Unique-AG/connectors/commit/ead00cafd35fde6016e2d0f614575ae2e83ef1df))
+* **deps:** bump ruff from 0.17.5 to 0.17.6 ([#1843](https://github.com/Unique-AG/connectors/issues/1843)) ([fa24435](https://github.com/Unique-AG/connectors/commit/fa24435438cc76b09838093786de2230efb61925))
+* **deps:** bump soupsieve from 4.0.1 to 4.1 ([#1662](https://github.com/Unique-AG/connectors/issues/1662)) ([773214b](https://github.com/Unique-AG/connectors/commit/773214b821d7b3395b7ced58f18594d828044629))
+* **deps:** bump soupsieve from 4.1 to 4.1.1 ([#1751](https://github.com/Unique-AG/connectors/issues/1751)) ([02654b3](https://github.com/Unique-AG/connectors/commit/02654b3033cf4f20183e73f26206e903fcd93a18))
+* **deps:** bump soupsieve from 4.1.1 to 4.1.2 ([#1835](https://github.com/Unique-AG/connectors/issues/1835)) ([844fabe](https://github.com/Unique-AG/connectors/commit/844fabef22e4fb3d1513c96ba864c8b4b23d2d74))
+* **deps:** bump soupsieve from 4.1.2 to 4.1.3 ([#1864](https://github.com/Unique-AG/connectors/issues/1864)) ([8889283](https://github.com/Unique-AG/connectors/commit/8889283d00b409e849eb245acb7084d3cbbe86c2))
+* **deps:** bump sqlalchemy from 2.1.8 to 2.1.9 ([#1786](https://github.com/Unique-AG/connectors/issues/1786)) ([9e0efdc](https://github.com/Unique-AG/connectors/commit/9e0efdc77b846a9b0531fafe37745b96a4f05b01))
+* **deps:** bump sse-starlette from 3.7.0 to 3.7.1 ([#1909](https://github.com/Unique-AG/connectors/issues/1909)) ([a938777](https://github.com/Unique-AG/connectors/commit/a9387775399515a9c334552a70eefddd639f97cd))
+* **deps:** bump uncalled-for from 0.6.0 to 0.6.1 ([#1671](https://github.com/Unique-AG/connectors/issues/1671)) ([040c049](https://github.com/Unique-AG/connectors/commit/040c0493a01443a0ee87604114402bac7999719f))
+* **deps:** bump uncalled-for from 0.6.1 to 0.6.2 ([#1836](https://github.com/Unique-AG/connectors/issues/1836)) ([c4011cd](https://github.com/Unique-AG/connectors/commit/c4011cd1972f26dfb44ac7b21c4991ed48c404f5))
+
 ## [3.1.0](https://github.com/Unique-AG/connectors/compare/backstop-mcp@3.0.0...backstop-mcp@3.1.0) (2026-11-12)
 
 
