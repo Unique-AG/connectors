@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.1.1](https://github.com/Unique-AG/connectors/compare/world-check-mcp@0.1.0...world-check-mcp@0.1.1) (2026-11-28)
+
+
+### Bug Fixes
+
+* **main:** allow Mcp-Method and Mcp-Name in the CORS settings (UN-30376) ([#1875](https://github.com/Unique-AG/connectors/issues/1875)) ([d1af265](https://github.com/Unique-AG/connectors/commit/d1af2657aaf475f097629f23fd3a60bbb89c60ac))
+* **world-check-mcp:** cite a World-Check profile by name with its source page (UN-30123, UN-30576) ([#1772](https://github.com/Unique-AG/connectors/issues/1772)) ([8a6ac15](https://github.com/Unique-AG/connectors/commit/8a6ac156b966b889448e4090138e345d05d2dd3f))
+
+
+### Dependencies
+
+* **deps:** bump argcomplete from 3.7.2 to 3.8.0 ([#1900](https://github.com/Unique-AG/connectors/issues/1900)) ([d61b0c4](https://github.com/Unique-AG/connectors/commit/d61b0c4fbb073e9f77cde8728a27de700b20f3c9))
+* **deps:** bump authlib from 1.9.6 to 1.9.8 ([#1794](https://github.com/Unique-AG/connectors/issues/1794)) ([a737049](https://github.com/Unique-AG/connectors/commit/a737049e13c4ee3c25efbb95b9df7dcfd2284bd0))
+* **deps:** bump authlib from 1.9.8 to 1.9.9 ([#1813](https://github.com/Unique-AG/connectors/issues/1813)) ([c636a65](https://github.com/Unique-AG/connectors/commit/c636a6566c10edf37b3400988aedb43c13c92e4e))
+* **deps:** bump authlib from 1.9.9 to 1.9.10 ([#1862](https://github.com/Unique-AG/connectors/issues/1862)) ([ea4325a](https://github.com/Unique-AG/connectors/commit/ea4325aea22e772767b2f89ed0d72a5cca62a8ba))
+* **deps:** bump certifi from 2026.10.23 to 2026.11.20 ([#1856](https://github.com/Unique-AG/connectors/issues/1856)) ([60055c9](https://github.com/Unique-AG/connectors/commit/60055c929bca28cda5f34b0226b6fb27133f41a8))
+* **deps:** bump cyclopts from 5.5.0 to 5.5.2 ([#1780](https://github.com/Unique-AG/connectors/issues/1780)) ([cac9f6f](https://github.com/Unique-AG/connectors/commit/cac9f6f1c2e94970c861c1fd128e8f0754769cb4))
+* **deps:** bump exceptiongroup from 1.3.1 to 1.3.2 ([#1846](https://github.com/Unique-AG/connectors/issues/1846)) ([970d246](https://github.com/Unique-AG/connectors/commit/970d246a26f26d76124591cb6ce89f00cfdd51f2))
+* **deps:** bump filelock from 4.2.10 to 4.2.12 ([#1814](https://github.com/Unique-AG/connectors/issues/1814)) ([c4780b7](https://github.com/Unique-AG/connectors/commit/c4780b79c308be60bb5abfff535e99a8dd9c9b4f))
+* **deps:** bump filelock from 4.2.10 to 4.3.0 ([#1904](https://github.com/Unique-AG/connectors/issues/1904)) ([4a5e291](https://github.com/Unique-AG/connectors/commit/4a5e291583f7760f9f6f8e9f103a21000ad52888))
+* **deps:** bump httpx2 from 2.16.0 to 2.16.2 ([#1785](https://github.com/Unique-AG/connectors/issues/1785)) ([9613d9a](https://github.com/Unique-AG/connectors/commit/9613d9a5b39d60fcd92c0b6ad1f87a53e489c136))
+* **deps:** bump import-linter from 2.16 to 2.17 ([#1833](https://github.com/Unique-AG/connectors/issues/1833)) ([d152dfa](https://github.com/Unique-AG/connectors/commit/d152dfa30f9c0f2bce9a6d66c9c667869b8d6e36))
+* **deps:** bump numpy from 2.5.4 to 2.5.5 ([#1763](https://github.com/Unique-AG/connectors/issues/1763)) ([d5410b6](https://github.com/Unique-AG/connectors/commit/d5410b620f844177b4c6e6abb935da3350c3c4aa))
+* **deps:** bump platformdirs from 4.14.5 to 4.14.7 ([#1816](https://github.com/Unique-AG/connectors/issues/1816)) ([cee2479](https://github.com/Unique-AG/connectors/commit/cee247999c44f0ffc1a43a113a3b29560b02d1f5))
+* **deps:** bump platformdirs from 4.14.7 to 4.14.8 ([#1863](https://github.com/Unique-AG/connectors/issues/1863)) ([78ee019](https://github.com/Unique-AG/connectors/commit/78ee0194e356ee61525506a55305f863a3050e85))
+* **deps:** bump pydantic packages ([#1842](https://github.com/Unique-AG/connectors/issues/1842)) ([a9659e6](https://github.com/Unique-AG/connectors/commit/a9659e6843c18fb2c353f0fa352949b9abf32ade))
+* **deps:** bump python-multipart from 0.0.33 to 0.0.34 ([#1795](https://github.com/Unique-AG/connectors/issues/1795)) ([e9308f1](https://github.com/Unique-AG/connectors/commit/e9308f15747922a00562d05a9bae9b0c084af7cc))
+* **deps:** bump pyyaml from 6.0.3 to 6.0.4 ([#1857](https://github.com/Unique-AG/connectors/issues/1857)) ([75520d0](https://github.com/Unique-AG/connectors/commit/75520d05afea62069dddb286aff9a1a75b89fa34))
+* **deps:** bump regex from 2026.11.15 to 2026.11.19 ([#1834](https://github.com/Unique-AG/connectors/issues/1834)) ([b8f54b6](https://github.com/Unique-AG/connectors/commit/b8f54b635559c9fa8e275082a95f0ba733f40ba1))
+* **deps:** bump regex from 2026.11.9 to 2026.11.15 ([#1764](https://github.com/Unique-AG/connectors/issues/1764)) ([89a3c6a](https://github.com/Unique-AG/connectors/commit/89a3c6a7bdd760577bfb4cd981a7aec075d23d4c))
+* **deps:** bump ruff from 0.17.5 to 0.17.6 ([#1843](https://github.com/Unique-AG/connectors/issues/1843)) ([fa24435](https://github.com/Unique-AG/connectors/commit/fa24435438cc76b09838093786de2230efb61925))
+* **deps:** bump sse-starlette from 3.7.0 to 3.7.1 ([#1909](https://github.com/Unique-AG/connectors/issues/1909)) ([a938777](https://github.com/Unique-AG/connectors/commit/a9387775399515a9c334552a70eefddd639f97cd))
+* **deps:** bump typeguard from 4.6.0 to 4.6.1 ([#1847](https://github.com/Unique-AG/connectors/issues/1847)) ([e647809](https://github.com/Unique-AG/connectors/commit/e647809318dac0687c6ec2566edc27910a96e410))
+* **deps:** bump uncalled-for from 0.6.1 to 0.6.2 ([#1836](https://github.com/Unique-AG/connectors/issues/1836)) ([c4011cd](https://github.com/Unique-AG/connectors/commit/c4011cd1972f26dfb44ac7b21c4991ed48c404f5))
+* **deps:** bump unique packages ([#1858](https://github.com/Unique-AG/connectors/issues/1858)) ([683a223](https://github.com/Unique-AG/connectors/commit/683a223a44216b110e873b2aec88ae47ffb35440))
+
 ## 0.1.0 (2026-11-19)
 
 
