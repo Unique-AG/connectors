@@ -21,9 +21,9 @@ dependencies = [
     "python-dotenv==1.2.4",
     "starlette==1.10.0",
     "tenacity==9.2.1",
-    "unique-mcp==2026.44.2",
-    "unique-sdk==2026.44.2",
-    "unique-toolkit[monitoring,otel]==2026.44.2",
+    "unique-mcp==2026.48.0",
+    "unique-sdk==2026.48.0",
+    "unique-toolkit[monitoring,otel]==2026.48.0",
     "uvicorn[standard]==0.54.0",
 ]
 
