@@ -9,7 +9,7 @@ dependencies = [
     "cryptography==50.0.2",
     "fastmcp==4.1.4",
     "httpx==0.28.1",
-    "httpx2==2.16.0",
+    "httpx2==2.16.2",
     "mcp-configs==0.1.0",
     "mcp-observability==0.1.0",
     "mcp-openapi==0.1.0",
