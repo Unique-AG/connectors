@@ -1,10 +1,11 @@
-# mcp-scaffold-commit: 6474bb8667dc, timestamp: 2026-11-16T10:36:30+00:00
 apiVersion: v2
 name: kyckr-mcp
-description: "Search company registries and order registry documents through Kyckr for KYC and KYB workflows."
+description: >-
+  Search company registries and order registry documents through Kyckr for KYC
+  and KYB workflows.
 type: application
-version: 0.1.1
-appVersion: 0.1.1
+version: 0.1.2
+appVersion: 0.1.2
 dependencies:
   - name: base
     repository: oci://ghcr.io/unique-ag/helm

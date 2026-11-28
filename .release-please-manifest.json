@@ -10,5 +10,5 @@
   "services/world-check-mcp": "0.1.0",
   "services/polixis-mcp": "0.0.1",
   "services/space-config-mcp": "0.0.0",
-  "services/kyckr-mcp": "0.1.1"
+  "services/kyckr-mcp": "0.1.2"
 }
