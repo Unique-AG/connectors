@@ -3,7 +3,7 @@
   "services/teams-mcp": "0.5.3",
   "services/confluence-connector": "3.1.0",
   "services/outlook-semantic-mcp": "6.0.0",
-  "services/kb-mcp": "0.1.9",
+  "services/kb-mcp": "0.1.10",
   "services/backstop-mcp": "3.1.0",
   "services/office-365-mcp": "0.4.0",
   "services/with-intelligence-mcp": "0.2.1",
