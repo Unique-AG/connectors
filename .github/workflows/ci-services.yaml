@@ -39,11 +39,15 @@ concurrency:
 jobs:
   detect-changes:
     name: Detect changes (Node)
+    if: >-
+      !(startsWith(github.head_ref, 'release-please--branches--main--components--') &&
+      github.event.pull_request.user.login == 'github-actions[bot]')
     runs-on: ubuntu-slim
     timeout-minutes: 5
     outputs:
       services: ${{ steps.build-matrix.outputs.services }}
       packages-changed: ${{ steps.filter.outputs.packages }}
+      deploy-checks: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.deploy == 'true' || steps.filter.outputs.workflow == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -58,6 +62,8 @@ jobs:
           filters: |
             services:
               - 'services/**'
+            deploy:
+              - 'services/*/deploy/**'
             packages:
               - 'packages/**'
               - '!packages/mcp-architecture/**'
@@ -167,3 +173,4 @@ jobs:
     with:
       service-name: ${{ matrix.service }}
       service-path: services/${{ matrix.service }}
+      run-deploy-checks: ${{ needs.detect-changes.outputs.deploy-checks == 'true' }}

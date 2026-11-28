@@ -250,7 +250,7 @@ jobs:
   publish:
     name: Publish ${{ matrix.entry.slug }}
     needs: [plan, bump, credentials]
-    if: always() && needs.credentials.result == 'success' && needs.plan.outputs.mode == 'pr' && needs.plan.outputs.entries != '[]'
+    if: ${{ !cancelled() && needs.credentials.result == 'success' && needs.plan.outputs.mode == 'pr' && needs.plan.outputs.entries != '[]' }}
     runs-on: gh-static-ip-slim # the GitHub App accepts only fixed IP addresses
     environment: workflow-automation # to read the credentials of the GitHub App
     timeout-minutes: 10
