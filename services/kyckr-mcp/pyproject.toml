@@ -1,7 +1,7 @@
 # mcp-scaffold-commit: 6474bb8667dc, timestamp: 2026-11-16T10:36:30+00:00
 [project]
 name = "kyckr-mcp"
-version = "0.1.1"
+version = "0.1.2"
 description = "Search company registries and order registry documents through Kyckr for KYC and KYB workflows."
 classifiers = ["Development Status :: 3 - Alpha"]
 requires-python = ">=3.14"
