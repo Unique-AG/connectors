@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.4](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.5.3...teams-mcp@0.5.4) (2026-11-28)
+
+
+### Features
+
+* **mcp-oauth,teams-mcp,outlook-semantic-mcp:** absolute refresh-token expiry and an optional provider refresh token (UN-30471) ([#1917](https://github.com/Unique-AG/connectors/issues/1917)) ([d8f0d03](https://github.com/Unique-AG/connectors/commit/d8f0d03bbb05c4fc94c59fab55ca8be24c7b4de7))
+
+
+### Bug Fixes
+
+* **teams-mcp:** cite each Teams message by a title and its Teams link (UN-30123, UN-30575) ([#1770](https://github.com/Unique-AG/connectors/issues/1770)) ([b1f66e8](https://github.com/Unique-AG/connectors/commit/b1f66e8ac0ae501fe93f31d9ce1a17474606db9f))
+
 ## [0.5.3](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.5.2...teams-mcp@0.5.3) (2026-11-23)
 
 
